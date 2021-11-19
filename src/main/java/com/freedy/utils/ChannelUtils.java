@@ -1,8 +1,10 @@
 package com.freedy.utils;
 
 import com.freedy.Struct;
+import com.freedy.intranetPenetration.OccupyState;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandlerContext;
 import io.netty.util.AttributeKey;
 
 import java.net.SocketAddress;
@@ -16,14 +18,35 @@ import java.util.regex.Pattern;
  */
 public class ChannelUtils {
 
-    private static final AttributeKey<Struct.SocketQuad> groupInfo = AttributeKey.valueOf("groupInfo");
+    private static final AttributeKey<Struct.ConfigGroup> GROUP_INFO = AttributeKey.valueOf("groupInfo");
 
-    public static Struct.SocketQuad getGroup(Channel channel) {
-        return channel.attr(groupInfo).get();
+    public static Struct.ConfigGroup getGroup(Channel channel) {
+        return channel.attr(GROUP_INFO).get();
     }
 
-    public static void setGroup(Channel channel, Struct.SocketQuad group) {
-        channel.attr(groupInfo).set(group);
+    public static void setGroup(Channel channel, Struct.ConfigGroup group) {
+        channel.attr(GROUP_INFO).set(group);
+    }
+
+    private static final AttributeKey<Boolean> IS_INIT = AttributeKey.valueOf("isInit");
+
+    public static boolean isInit(Channel channel) {
+        Boolean isInit = channel.attr(IS_INIT).get();
+        return isInit != null && isInit;
+    }
+
+    public static void setInit(Channel channel, boolean state) {
+        channel.attr(IS_INIT).set(state);
+    }
+
+    private static final AttributeKey<OccupyState> occupied =AttributeKey.valueOf("occupied");
+
+    public static void setOccupy(Channel channel,OccupyState state){
+        channel.attr(occupied).set(state);
+    }
+
+    public static OccupyState getOccupy(Channel channel){
+        return channel.attr(occupied).get();
     }
 
 
@@ -33,6 +56,10 @@ public class ChannelUtils {
             return true;
         }
         return false;
+    }
+
+    public static boolean sendString(ChannelHandlerContext ctx, String s) {
+        return sendString(ctx.channel(), s);
     }
 
 

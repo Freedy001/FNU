@@ -3,18 +3,18 @@ package com.freedy.intranetPenetration.remote;
 import com.freedy.Context;
 import com.freedy.Struct;
 import com.freedy.errorProcessor.ErrorHandler;
-import io.netty.buffer.Unpooled;
+import com.freedy.intranetPenetration.OccupyState;
+import com.freedy.loadBalancing.LoadBalance;
+import com.freedy.utils.ChannelUtils;
+import com.freedy.utils.ReleaseUtil;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
-import io.netty.util.Attribute;
-import io.netty.util.AttributeKey;
-import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.FutureListener;
 import io.netty.util.concurrent.Promise;
 
-import java.nio.charset.Charset;
-import java.util.ArrayList;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * @author Freedy
@@ -22,18 +22,20 @@ import java.util.ArrayList;
  */
 public class RequestReceiver extends ChannelInboundHandlerAdapter {
 
-    private final int port;
-    private final AttributeKey<Struct.OccupyState> occupied =AttributeKey.valueOf("occupied");
+    private final LoadBalance<Channel> lb;
     private Channel intranetChannel;
     private int retryCount=0;
+    private int changeTimes=0;
+    public static final Map<Channel,Channel> intranetReceiverMap=new ConcurrentHashMap<>();
+    public static final Map<Channel,Channel> receiverIntranetMap=new ConcurrentHashMap<>();
 
     public RequestReceiver(int remotePort) {
-        port=remotePort;
+        lb=ChanelWarehouse.PORT_CHANNEL_CACHE.get(remotePort);
     }
 
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
-         intranetChannel = ChanelWarehouse.PORT_CHANNEL_CACHE.get(port).getElement();
+         intranetChannel = lb.getElement();
     }
 
     @Override
@@ -44,38 +46,41 @@ public class RequestReceiver extends ChannelInboundHandlerAdapter {
         }
         Channel receiverChannel = ctx.channel();
         if (intranetChannel.isActive()){
-            Attribute<Struct.OccupyState> attr = intranetChannel.attr(occupied);
-            Struct.OccupyState hasOccupy = attr.get();
-            if (hasOccupy ==null){
-                attr.set(hasOccupy=new Struct.OccupyState(true,receiverChannel,new ArrayList<>()));
-            }
+            retryCount=0; // 重置连接失败次数
 
-            if (!hasOccupy.occupied()||hasOccupy.receiverChannel()==receiverChannel){
+            OccupyState state = ChannelUtils.getOccupy(intranetChannel);
+
+            if (state.tryOccupy(receiverChannel)){
                 //转发信息
                 intranetChannel.writeAndFlush(msg);
-            }else {
-                //等待
-                Promise<Channel> promise = ctx.executor().newPromise();
-                promise.addListener((FutureListener<Channel>) future->{
-                    if (future.isSuccess()){
-                        Channel futureChannel = future.getNow();
-                        futureChannel.writeAndFlush(msg);
-                    }
-                });
-                hasOccupy.wakeupList().add(promise);
+                intranetReceiverMap.put(intranetChannel, receiverChannel);
+                receiverIntranetMap.put(receiverChannel, intranetChannel);
+            }else {         //管道繁忙，尝试其他管道
+                if (changeTimes>=lb.size()){
+                    //等待
+                    Promise<Channel> promise = ctx.executor().newPromise();
+                    promise.addListener((FutureListener<Channel>) future->{
+                        if (future.isSuccess()){
+                            Channel futureChannel = future.getNow();
+                            futureChannel.writeAndFlush(msg);
+                        }
+                    });
+                    state.submitTask(promise);
+                }
+                //切换管道
+                intranetChannel = lb.getElement();
+                changeTimes++;
+                channelRead(ctx,msg);
             }
-
         }else {
             if (retryCount>=Context.INTRANET_CHANNEL_RETRY_TIME){
                 //尝试失败次数大于临界值
-                ReferenceCountUtil.release(msg);
-                receiverChannel.writeAndFlush(
-                        Unpooled.copiedBuffer("404 Not Found", Charset.defaultCharset())
-                );
+                ErrorHandler.handle(ctx,msg);
+                ReleaseUtil.release(msg);
             }
             retryCount++;
             //切换管道
-            intranetChannel = ChanelWarehouse.PORT_CHANNEL_CACHE.get(port).getElement();
+            intranetChannel = lb.getElement();
             channelRead(ctx,msg);
         }
 

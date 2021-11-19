@@ -27,7 +27,7 @@ import java.nio.charset.Charset;
 @Slf4j
 public class HeartBeatHandler extends ChannelInboundHandlerAdapter {
 
-    private final AttributeKey<Struct.SocketQuad> groupInfo = AttributeKey.valueOf("groupInfo");
+    private final AttributeKey<Struct.ConfigGroup> groupInfo = AttributeKey.valueOf("groupInfo");
     int readIdleTimes = 0;
 
     @Override

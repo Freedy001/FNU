@@ -3,7 +3,11 @@ package com.freedy;
 import io.netty.channel.Channel;
 import io.netty.util.concurrent.Promise;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 一个结构体的集合
@@ -14,11 +18,15 @@ import java.util.List;
 public class Struct {
 
     /**
-     * socket四元组
+     * 内网穿透配置组信息
      */
-    public record SocketQuad(
-            String localAddress, int localPort,
-            String remoteAddress, int remotePort
+    public record ConfigGroup(
+            //本地需要穿透的服务的ip与端口
+            String localServerAddress, int localServerPort,
+            //远程服务器的ip与端口
+            String remoteAddress, int remotePort,
+            //远程服务器提供服务的端口
+            int remoteServerPort
     ) {
     }
 
@@ -32,27 +40,15 @@ public class Struct {
         }
 
         public boolean addressEqual(IpAddress address) {
-            return address.address().equals(this.address);
+            return address.address().equals(address());
         }
 
         @Override
         public boolean equals(Object obj) {
+            if (obj instanceof IpAddress address) {
+                return portEqual(address) && addressEqual(address);
+            }
             return false;
         }
     }
-
-    /**
-     * 缓存池中的channel状态
-     */
-    public record OccupyState(
-            //是否被占用
-            boolean occupied,
-            //接收器的channel
-            Channel receiverChannel,
-            //需要被唤醒的队列
-            List<Promise<Channel>> wakeupList
-    ) {
-    }
-
-
 }

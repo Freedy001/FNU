@@ -2,6 +2,8 @@ package com.freedy.loadBalancing;
 
 
 import com.freedy.Struct;
+import lombok.Getter;
+import lombok.ToString;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -11,9 +13,11 @@ import java.util.List;
  * @author Freedy
  * @date 2021/11/16 20:09
  */
+@ToString
 public abstract class LoadBalance<T> {
     protected List<Object> lbElement=new ArrayList<>();
     protected int elementSize;
+    @Getter
     protected Object[] attribute;
 
     synchronized void loadAddress(String[] remoteAddress){
@@ -24,6 +28,10 @@ public abstract class LoadBalance<T> {
             String[] split = address.split(":");
             this.lbElement.add(new Struct.IpAddress(split[0], Integer.parseInt(split[1])));
         }
+    }
+
+    public synchronized int size(){
+        return elementSize;
     }
 
     public synchronized void setElement(T[] element) {

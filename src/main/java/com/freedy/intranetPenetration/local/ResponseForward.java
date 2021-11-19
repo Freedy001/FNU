@@ -20,11 +20,10 @@ public class ResponseForward extends ChannelInboundHandlerAdapter {
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
         if (remoteServerChannel.isActive()) {
+            //无脑转发即可
             remoteServerChannel.writeAndFlush(msg);
         } else {
             ReferenceCountUtil.release(msg);
         }
     }
-
-
 }

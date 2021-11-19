@@ -44,7 +44,7 @@ public class HeartBeatHandler extends ChannelInboundHandlerAdapter {
                     return;  // do nothing
                 }
 
-                List<Channel> channelList = IntranetClient.remoteChannelMap.get(ChannelUtils.getGroup(ctx.channel()));
+                List<Channel> channelList = ClientConnector.remoteChannelMap.get(ChannelUtils.getGroup(ctx.channel()));
                 for (int i = 0; i < channelList.size(); i++) {
                     Struct.IpAddress ipAddress = ChannelUtils.parseAddress(channelList.get(i).localAddress());
                     if (inActiveIP.portEqual(ipAddress)){
@@ -69,19 +69,22 @@ public class HeartBeatHandler extends ChannelInboundHandlerAdapter {
             }
 
             if (readIdleTimes > Context.INTRANET_READER_IDLE_TIMES) { // 读空闲超时
-                Channel channel = ctx.channel();
-                Struct.SocketQuad group = ChannelUtils.getGroup(channel);
-                IntranetClient.remoteChannelMap.get(group).remove(channel);
+                channelInactive(ctx);
             }
         } else {
             ctx.fireUserEventTriggered(evt);
         }
     }
 
+
     @Override
     public void channelInactive(ChannelHandlerContext ctx) {
-
+        Channel channel = ctx.channel();
+        Struct.ConfigGroup group = ChannelUtils.getGroup(channel);
+        ClientConnector.remoteChannelMap.get(group).remove(channel);
     }
+
+
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {

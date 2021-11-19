@@ -34,11 +34,14 @@ public class Context {
     public final static LoadBalance<Struct.IpAddress> PROXY_LB;
 
 
+    public final static int INTRANET_REMOTE_PORT=8888;
     //内网穿透每组所缓存的管道数量
     public final static int INTRANET_CHANNEL_CACHE_SIZE = 30;
     //内网穿透配置组
-    public final static Struct.SocketQuad[] INTRANET_GROUPS = {new Struct.SocketQuad(
-            "127.0.0.1", 4567, "127.0.0.1", 9000
+    public final static Struct.ConfigGroup[] INTRANET_GROUPS = {new Struct.ConfigGroup(
+            "127.0.0.1", 4567, 
+            "127.0.0.1", 8888,
+            9090
     )};
 
     public final static String PORT_CHANNEL_CACHE_LB_NAME = "Round Robin";
@@ -48,7 +51,7 @@ public class Context {
     //读超时时间
     public final static int INTRANET_READER_IDLE_TIME = 5;
     //连接失败次数
-    public final static int INTRANET_MAX_BAD_CONNECT_TIMES=30;
+    public final static int INTRANET_MAX_BAD_CONNECT_TIMES=90;
 
     //换行符
     public final static String LF = System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("win") ? "\r\n" : "\n";
@@ -66,7 +69,7 @@ public class Context {
         }
 
         //启动加密
-        if (properties.getProperty("encryption.start").equals("true")) {
+        if (properties.getProperty("encryption.start","null").equals("true")) {
             AES_KEY = properties.getProperty("encryption.aes.key");
             int times = Integer.parseInt(properties.getProperty("encryption.authenticationTime"));
             String authStr = AES_KEY;
@@ -82,7 +85,7 @@ public class Context {
         }
 
         //启动本地转发服务
-        if (properties.getProperty("local.start").equals("true")) {
+        if (properties.getProperty("local.start","null").equals("true")) {
             LOCAL_PORT = Integer.parseInt(properties.getProperty("local.server.port"));
             REMOTE_LB = LoadBalanceFactory.produceByAddressAndName(
                     properties.getProperty("local.connect.address").split(","),
@@ -96,14 +99,14 @@ public class Context {
         }
 
         //启动远程代理服务
-        if (properties.getProperty("remote.start").equals("true")) {
+        if (properties.getProperty("remote.start","null").equals("true")) {
             REMOTE_PORT = Integer.parseInt(properties.getProperty("remote.server.port"));
         } else {
             REMOTE_PORT = -1;
         }
 
         //反向代理服务
-        if (properties.getProperty("proxy.start").equals("true")) {
+        if (properties.getProperty("proxy.start","null").equals("true")) {
             PROXY_PORT = Integer.parseInt(properties.getProperty("proxy.port"));
             PROXY_LB = LoadBalanceFactory.produceByAddressAndName(
                     properties.getProperty("proxy.server.address").split(","),
@@ -119,6 +122,7 @@ public class Context {
     }
 
     public static void main(String[] args) throws Exception {
+
         ArrayList<Channel> channelList = new ArrayList<>();
         if (LOCAL_PORT != -1) {
             Channel channel = LocalServer.start(LOCAL_PORT, REMOTE_LB, false);

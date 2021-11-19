@@ -1,5 +1,7 @@
 package com.freedy.errorProcessor;
 
+import com.freedy.Protocol;
+import com.freedy.utils.ChannelUtils;
 import com.freedy.utils.ReleaseUtil;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
@@ -40,7 +42,13 @@ public class ErrorHandler {
         response.headers().set(CONTENT_TYPE, "text/plain");
         response.headers().set(CONTENT_LENGTH, errPage.length);
         response.content().writeBytes(errPage);
+        ReleaseUtil.release(msg);
         ReleaseUtil.closeOnFlush(channel);
+    }
+
+    public static void LocalServerErr(ChannelHandlerContext ctx, Object msg){
+        ChannelUtils.sendString(ctx, Protocol.HEARTBEAT_LOCAL_ERROR_MSG);
+        ReleaseUtil.release(msg);
     }
 
 
