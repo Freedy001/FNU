@@ -10,6 +10,7 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.serialization.ObjectDecoder;
 import io.netty.handler.codec.serialization.ObjectEncoder;
 import io.netty.handler.timeout.IdleStateHandler;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.concurrent.TimeUnit;
 
@@ -31,6 +32,7 @@ import java.util.concurrent.TimeUnit;
  * @author Freedy
  * @date 2021/11/17 15:50
  */
+@Slf4j
 public class ClientHandshake extends SimpleChannelInboundHandler<String> {
 
     private final Struct.ConfigGroup group;
@@ -40,17 +42,15 @@ public class ClientHandshake extends SimpleChannelInboundHandler<String> {
         this.group = group;
     }
 
-    @Override
-    public void channelActive(ChannelHandlerContext ctx) throws Exception {
-        ctx.writeAndFlush(group);
-    }
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, String msg) throws Exception {
         if (msg.startsWith(Protocol.ACK)) {
+            log.debug("[client]接收ACK");
             Channel channel = ctx.channel();
             if (isFirst) {
                 ChannelUtils.setGroup(channel, group);
+                log.debug("[client]发送CONNECT ESTABLISH SUCCEED!");
                 channel.writeAndFlush(Protocol.CONNECTION_SUCCESS_MSG);
                 isFirst=false;
             } else {
@@ -62,8 +62,14 @@ public class ClientHandshake extends SimpleChannelInboundHandler<String> {
                         new HeartBeatHandler(),
                         new RequestListener()
                 );
+                ChannelUtils.setInit(channel,true);
             }
 
         }
+    }
+
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+        log.info("[EXCEPTION]: " + cause.getMessage());
     }
 }

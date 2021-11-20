@@ -46,8 +46,8 @@ public abstract class LoadBalance<T> {
     }
 
     public synchronized void removeElement(T element){
-        lbElement.remove(element);
-        elementSize--;
+        if (lbElement.remove(element))
+            elementSize--;
     }
 
     public T getElement() {

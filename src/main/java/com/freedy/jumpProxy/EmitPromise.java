@@ -1,4 +1,4 @@
-package com.freedy;
+package com.freedy.jumpProxy;
 
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;

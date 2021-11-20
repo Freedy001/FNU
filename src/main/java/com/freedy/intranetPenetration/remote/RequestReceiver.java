@@ -1,17 +1,15 @@
 package com.freedy.intranetPenetration.remote;
 
-import com.freedy.Context;
 import com.freedy.Struct;
 import com.freedy.errorProcessor.ErrorHandler;
+import com.freedy.intranetPenetration.ForwardTask;
 import com.freedy.intranetPenetration.OccupyState;
 import com.freedy.loadBalancing.LoadBalance;
 import com.freedy.utils.ChannelUtils;
-import com.freedy.utils.ReleaseUtil;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
-import io.netty.util.concurrent.FutureListener;
-import io.netty.util.concurrent.Promise;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -20,6 +18,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * @author Freedy
  * @date 2021/11/17 21:13
  */
+@Slf4j
 public class RequestReceiver extends ChannelInboundHandlerAdapter {
 
     private final LoadBalance<Channel> lb;
@@ -34,8 +33,14 @@ public class RequestReceiver extends ChannelInboundHandlerAdapter {
     }
 
     @Override
-    public void channelActive(ChannelHandlerContext ctx) throws Exception {
-         intranetChannel = lb.getElement();
+    public void channelActive(ChannelHandlerContext ctx) {
+        intranetChannel = lb.getElement();
+        if (intranetChannel != null) {
+            //打印日志
+            Struct.ConfigGroup group = ChannelUtils.getGroup(intranetChannel);
+            log.info("Redirect {} to {} for request {}", ctx.channel().remoteAddress().toString().substring(1), intranetChannel.remoteAddress().toString().substring(1), group.getLocalServerAddress() + ":" + group.getLocalServerPort());
+        }
+
     }
 
     @Override
@@ -49,40 +54,43 @@ public class RequestReceiver extends ChannelInboundHandlerAdapter {
             retryCount=0; // 重置连接失败次数
 
             OccupyState state = ChannelUtils.getOccupy(intranetChannel);
-
+            //System.out.println(state);
             if (state.tryOccupy(receiverChannel)){
                 //转发信息
+                //System.out.println("转发消息");
                 intranetChannel.writeAndFlush(msg);
                 intranetReceiverMap.put(intranetChannel, receiverChannel);
                 receiverIntranetMap.put(receiverChannel, intranetChannel);
             }else {         //管道繁忙，尝试其他管道
-                if (changeTimes>=lb.size()){
-                    //等待
-                    Promise<Channel> promise = ctx.executor().newPromise();
-                    promise.addListener((FutureListener<Channel>) future->{
-                        if (future.isSuccess()){
-                            Channel futureChannel = future.getNow();
-                            futureChannel.writeAndFlush(msg);
-                        }
-                    });
-                    state.submitTask(promise);
+                if (changeTimes >= lb.size()) {
+                    //提交一个任务 等待其他的任务执行完
+                    //System.out.println("提交一个任务 等待其他的任务执行完");
+                    state.submitTask(new ForwardTask());
+                    changeTimes = 0;
                 }
                 //切换管道
+                //System.out.println("管道繁忙,切换管道");
                 intranetChannel = lb.getElement();
                 changeTimes++;
-                channelRead(ctx,msg);
+                channelRead(ctx, msg);
             }
         }else {
-            if (retryCount>=Context.INTRANET_CHANNEL_RETRY_TIME){
+            if (retryCount >= lb.size()) {
                 //尝试失败次数大于临界值
-                ErrorHandler.handle(ctx,msg);
-                ReleaseUtil.release(msg);
+                //System.out.println("尝试失败次数大于临界值");
+                ErrorHandler.handle(ctx, msg);
             }
             retryCount++;
             //切换管道
+            //System.out.println("管道被关闭,切换管道");
             intranetChannel = lb.getElement();
             channelRead(ctx,msg);
         }
 
+    }
+
+    @Override
+    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+        ChannelUtils.getOccupy(intranetChannel).release(ctx.channel());
     }
 }

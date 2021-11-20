@@ -1,4 +1,4 @@
-package com.freedy.remote;
+package com.freedy.jumpProxy.remote;
 
 import com.freedy.AuthenticAndDecrypt;
 import com.freedy.AuthenticAndEncrypt;
@@ -22,10 +22,10 @@ import io.netty.handler.codec.http.HttpResponseEncoder;
 public class RemoteServer {
 
     public static void main(String[] args) throws Exception {
-        start();
+        start(1);
     }
 
-    public static Channel start() throws Exception {
+    public static Channel start(int port) throws Exception {
         ServerBootstrap bootstrap = new ServerBootstrap();
         bootstrap.option(ChannelOption.SO_BACKLOG, 10240)
                 .group(new NioEventLoopGroup(1), new NioEventLoopGroup(0))
@@ -54,7 +54,6 @@ public class RemoteServer {
                         }
                     }
                 });
-        int port = Context.REMOTE_PORT;
         Channel channel = bootstrap.bind(port).sync().channel();
         System.out.println("remote server start on port:" + port);
         return channel;

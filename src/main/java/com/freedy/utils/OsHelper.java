@@ -1,4 +1,4 @@
-package com.freedy;
+package com.freedy.utils;
 
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.epoll.EpollEventLoopGroup;

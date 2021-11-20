@@ -1,4 +1,4 @@
-package com.freedy;
+package com.freedy.utils;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.SecretKeySpec;

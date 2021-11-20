@@ -2,9 +2,12 @@ package com.freedy.intranetPenetration.local;
 
 import com.freedy.Context;
 import com.freedy.Struct;
+import com.freedy.intranetPenetration.ChannelDaemonThread;
+import com.freedy.intranetPenetration.ParentChannelFuture;
 import com.freedy.intranetPenetration.remote.IntranetServer;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
@@ -20,7 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.locks.LockSupport;
+import java.util.concurrent.FutureTask;
 
 /**
  * @author Freedy
@@ -29,27 +32,37 @@ import java.util.concurrent.locks.LockSupport;
 @Slf4j
 public class ClientConnector {
 
-    public final static Bootstrap bootstrap = new Bootstrap();
+    private final static Bootstrap bootstrap = new Bootstrap();
     public final static Map<Struct.ConfigGroup, List<Channel>> remoteChannelMap = new ConcurrentHashMap<>();
 
 
-    public static void start() {
-        bootstrap.group(new NioEventLoopGroup(0, new DefaultThreadFactory("worker")))
+    public static ParentChannelFuture start() {
+        final ParentChannelFuture future = new ParentChannelFuture();
+        bootstrap.group(new NioEventLoopGroup(0, new DefaultThreadFactory("intranet-client-worker")))
                 .channel(NioSocketChannel.class)
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10000)
-                .option(ChannelOption.SO_KEEPALIVE, true);
+                .option(ChannelOption.SO_KEEPALIVE, true)
+                .handler(new ChannelInitializer<>() {
+                    @Override
+                    protected void initChannel(Channel ch) {
+                        //do noting
+                        future.setChannel(ch);
+                    }
+                })
+        ;
 
         //初始化配置消息
         for (Struct.ConfigGroup group : Context.INTRANET_GROUPS) {
             remoteChannelMap.put(group,new CopyOnWriteArrayList<>());
         }
 
+        //开始连接客户端
         Thread thread = new Thread(new ChannelDaemonThread(), "Channel Daemon Thread");
-        thread.start();
         thread.setDaemon(true);
+        thread.start();
 
         System.out.println("Intranet client started success!");
-        LockSupport.park();
+        return future;
     }
 
     /**
@@ -60,7 +73,7 @@ public class ClientConnector {
     @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     public static boolean initConnection(Struct.ConfigGroup group) {
         try {
-            Channel channel = bootstrap.connect(group.remoteAddress(), group.remotePort()).sync().channel();
+            Channel channel = bootstrap.connect(group.getRemoteAddress(), group.getRemotePort()).sync().channel();
             channel.pipeline().addLast(
                     new LengthFieldBasedFrameDecoder(Integer.MAX_VALUE, 0, 4, 0, 4),
                     new LengthFieldPrepender(4),
@@ -68,6 +81,8 @@ public class ClientConnector {
                     new ObjectDecoder(ClassResolvers.cacheDisabled(IntranetServer.class.getClassLoader())),
                     new ClientHandshake(group)
             );
+            log.debug("[client]发送配置消息[{}]",group);
+            channel.writeAndFlush(group);
 
             List<Channel> list = remoteChannelMap.get(group);
             if (list == null) {
@@ -90,7 +105,7 @@ public class ClientConnector {
      */
     public static Channel localServerConnect(Struct.ConfigGroup group,Channel remoteChannel) {
         try {
-            Channel channel = bootstrap.connect(group.localServerAddress(), group.localServerPort()).sync().channel();
+            Channel channel = bootstrap.connect(group.getLocalServerAddress(), group.getLocalServerPort()).sync().channel();
             channel.pipeline().addLast(new ResponseForward(remoteChannel));
             return channel;
         } catch (InterruptedException e) {

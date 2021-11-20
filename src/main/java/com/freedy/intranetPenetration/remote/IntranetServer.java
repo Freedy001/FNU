@@ -2,9 +2,8 @@ package com.freedy.intranetPenetration.remote;
 
 import com.freedy.Context;
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelOption;
+import io.netty.buffer.ByteBuf;
+import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
@@ -12,19 +11,21 @@ import io.netty.handler.codec.LengthFieldPrepender;
 import io.netty.handler.codec.serialization.ClassResolvers;
 import io.netty.handler.codec.serialization.ObjectDecoder;
 import io.netty.handler.codec.serialization.ObjectEncoder;
+import io.netty.util.concurrent.DefaultThreadFactory;
 
-import java.util.concurrent.locks.LockSupport;
+import java.nio.charset.Charset;
 
 /**
  * @author Freedy
  * @date 2021/11/17 15:23
  */
 public class IntranetServer {
-    public static final NioEventLoopGroup workGroup = new NioEventLoopGroup(0);
+    public static final NioEventLoopGroup workGroup = new NioEventLoopGroup(0,new DefaultThreadFactory("intranet-server-worker"));
 
-    public static void main(String[] args) throws InterruptedException {
+
+    public static Channel start() throws InterruptedException {
         ServerBootstrap bootstrap = new ServerBootstrap();
-        bootstrap.group(
+        Channel channel = bootstrap.group(
                         new NioEventLoopGroup(1),
                         workGroup
                 )
@@ -43,11 +44,10 @@ public class IntranetServer {
                         );
                     }
                 })
-                .bind(Context.INTRANET_REMOTE_PORT);
+                .bind(Context.INTRANET_REMOTE_PORT).sync().channel();
 
         System.out.println("Intranet-Master-Server started success on port:" + Context.INTRANET_REMOTE_PORT);
-
-        LockSupport.park();
+        return channel;
 
     }
 

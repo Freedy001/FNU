@@ -1,6 +1,6 @@
-package com.freedy.remote;
+package com.freedy.jumpProxy.remote;
 
-import com.freedy.EmitPromise;
+import com.freedy.jumpProxy.EmitPromise;
 import com.freedy.utils.ReleaseUtil;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;

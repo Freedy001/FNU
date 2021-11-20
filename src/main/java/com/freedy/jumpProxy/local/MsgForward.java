@@ -1,4 +1,4 @@
-package com.freedy.local;
+package com.freedy.jumpProxy.local;
 
 import com.freedy.AuthenticAndDecrypt;
 import com.freedy.AuthenticAndEncrypt;
@@ -15,7 +15,6 @@ import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.LengthFieldPrepender;
 import lombok.extern.slf4j.Slf4j;
 
-import java.net.ConnectException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.regex.Matcher;
@@ -35,18 +34,20 @@ public class MsgForward extends ChannelInboundHandlerAdapter {
     private ChannelFuture connectFuture;
 
     private final LoadBalance<Struct.IpAddress> lb;
+    private final boolean isProxy;
+    private final int port;
     private String remoteAddress;
     private int remotePort;
-    private final boolean isProxy;
 
 
-    public MsgForward(LoadBalance<Struct.IpAddress> lb, boolean isProxy) {
+    public MsgForward(LoadBalance<Struct.IpAddress> lb, boolean isProxy, int port) {
         this.lb = lb;
         this.isProxy = isProxy;
+        this.port = port;
     }
 
     @Override
-    public void channelActive(ChannelHandlerContext ctx) throws Exception {
+    public void channelActive(ChannelHandlerContext ctx) {
         Channel localChannel = ctx.channel();
         bootstrap.group(localChannel.eventLoop())
                 .channel(NioSocketChannel.class)
@@ -54,14 +55,14 @@ public class MsgForward extends ChannelInboundHandlerAdapter {
                     @Override
                     protected void initChannel(Channel channel) {
                         if (Context.AES_KEY == null) {
-                            channel.pipeline().addLast(new LocalMsgForward(localChannel));
+                            channel.pipeline().addLast(new LocalMsgForward(localChannel,port));
                         } else {
                             channel.pipeline().addLast(
                                     new LengthFieldBasedFrameDecoder(Integer.MAX_VALUE, 0, 4, 0, 4),
                                     new LengthFieldPrepender(4),
                                     new AuthenticAndEncrypt(),
                                     new AuthenticAndDecrypt(),
-                                    new LocalMsgForward(localChannel)
+                                    new LocalMsgForward(localChannel,port)
                             );
                         }
                     }
@@ -117,7 +118,7 @@ public class MsgForward extends ChannelInboundHandlerAdapter {
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-        log.debug("close connection from LOCAL[{}] to REMOTE[{}]", Context.LOCAL_PORT, remoteAddress + ":" + remotePort);
+        log.debug("close connection from LOCAL[{}] to REMOTE[{}]", port, remoteAddress + ":" + remotePort);
         ReleaseUtil.closeOnFlush(connectFuture.sync().channel());
     }
 

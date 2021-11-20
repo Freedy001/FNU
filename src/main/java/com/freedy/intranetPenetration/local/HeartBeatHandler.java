@@ -32,10 +32,12 @@ public class HeartBeatHandler extends ChannelInboundHandlerAdapter {
         if (byteBuf instanceof ByteBuf msg) {
             String packMsg = msg.toString(Charset.defaultCharset());
             if (packMsg.startsWith(Protocol.HEARTBEAT_REMOTE_NORMAL_MSG)) {
+//                log.debug("[LOCAL-HEART-RECEIVE]: {}",packMsg);
                 msg.release();
                 // do nothing
                 return;
             } else if (packMsg.startsWith(Protocol.HEARTBEAT_REMOTE_ERROR_MSG)) {
+//                log.debug("[LOCAL-HEART-RECEIVE]: {}",packMsg);
                 msg.release();
                 //重新开启一个管道
                 String inactiveAddress = packMsg.split("!")[1];
@@ -80,6 +82,7 @@ public class HeartBeatHandler extends ChannelInboundHandlerAdapter {
     @Override
     public void channelInactive(ChannelHandlerContext ctx) {
         Channel channel = ctx.channel();
+        log.debug("管道被关闭: {}",channel.toString());
         Struct.ConfigGroup group = ChannelUtils.getGroup(channel);
         ClientConnector.remoteChannelMap.get(group).remove(channel);
     }

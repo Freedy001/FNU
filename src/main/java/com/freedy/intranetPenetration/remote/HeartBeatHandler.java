@@ -27,7 +27,7 @@ import java.nio.charset.Charset;
 @Slf4j
 public class HeartBeatHandler extends ChannelInboundHandlerAdapter {
 
-    private final AttributeKey<Struct.ConfigGroup> groupInfo = AttributeKey.valueOf("groupInfo");
+
     int readIdleTimes = 0;
 
     @Override
@@ -38,7 +38,9 @@ public class HeartBeatHandler extends ChannelInboundHandlerAdapter {
     }
 
     private boolean isHeartBeatPack(ChannelHandlerContext ctx, ByteBuf msg) {
-        if (msg.toString(Charset.defaultCharset()).startsWith(Protocol.HEARTBEAT_LOCAL_NORMAL_MSG)) {
+        String info = msg.toString(Charset.defaultCharset());
+        if (info.startsWith(Protocol.HEARTBEAT_LOCAL_NORMAL_MSG)) {
+//            log.debug("[REMOTE-HEART-RECEIVE]: {}",info);
             ChannelUtils.sendString(ctx.channel(), Protocol.HEARTBEAT_REMOTE_NORMAL_MSG);
             ReleaseUtil.release(msg);
             return true;
@@ -48,10 +50,7 @@ public class HeartBeatHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) {
-        Channel localChannel = ctx.channel();
-        int port = localChannel.attr(groupInfo).get().remotePort();
-        LoadBalance<Channel> balance = ChanelWarehouse.PORT_CHANNEL_CACHE.get(port);
-        balance.removeElement(localChannel);
+        requireNewChannelAndDeleteOld(ctx);
     }
 
     @Override
@@ -69,9 +68,10 @@ public class HeartBeatHandler extends ChannelInboundHandlerAdapter {
 
             if (event.state() == IdleState.READER_IDLE) {
                 readIdleTimes++; // 读空闲的计数加1
+                log.debug("读空闲[{}]",readIdleTimes);
             }
 
-            if (readIdleTimes > Context.INTRANET_READER_IDLE_TIMES) {
+            if (readIdleTimes >= Context.INTRANET_READER_IDLE_TIMES) {
                 requireNewChannelAndDeleteOld(ctx);
             }
         } else {
@@ -80,16 +80,17 @@ public class HeartBeatHandler extends ChannelInboundHandlerAdapter {
     }
 
     private void requireNewChannelAndDeleteOld(ChannelHandlerContext ctx) {
+        log.debug("关闭管道[{}]",ctx.channel().toString());
         Channel localChannel = ctx.channel();
-        int port = localChannel.attr(groupInfo).get().remotePort();
+        int port = ChannelUtils.getGroup(localChannel).getRemoteServerPort();
         LoadBalance<Channel> balance = ChanelWarehouse.PORT_CHANNEL_CACHE.get(port);
         balance.removeElement(localChannel);
+        localChannel.close();
         //通过下一个channel像客户端索要一个新的channel
         Channel nextChannel = balance.getElement();
         if (nextChannel == null) {
             return;
         }
-
         ChannelUtils.sendString(nextChannel, Protocol.HEARTBEAT_REMOTE_ERROR_MSG + localChannel.remoteAddress().toString());
     }
 }

@@ -29,7 +29,7 @@ public class RequestListener extends ChannelInboundHandlerAdapter {
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
         for (int retryCount = 0; localServerChannel == null; retryCount++) {
-            if (retryCount >= Context.INTRANET_CHANNEL_RETRY_TIME) {
+            if (retryCount >= Context.INTRANET_CHANNEL_RETRY_TIMES) {
                 ErrorHandler.LocalServerErr(ctx,msg);
                 return;
             }

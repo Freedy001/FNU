@@ -1,4 +1,4 @@
-package com.freedy.remote;
+package com.freedy.jumpProxy.remote;
 
 import com.freedy.utils.ReleaseUtil;
 import io.netty.buffer.Unpooled;

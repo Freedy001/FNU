@@ -1,4 +1,4 @@
-package com.freedy.local;
+package com.freedy.jumpProxy.local;
 
 import com.freedy.Context;
 import com.freedy.utils.ReleaseUtil;
@@ -15,9 +15,11 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class LocalMsgForward extends ChannelInboundHandlerAdapter {
     private final Channel localChannel;
+    private final int port;
 
-    public LocalMsgForward(Channel localChannel) {
+    public LocalMsgForward(Channel localChannel,int port) {
         this.localChannel = localChannel;
+        this.port=port;
     }
 
     @Override
@@ -31,7 +33,7 @@ public class LocalMsgForward extends ChannelInboundHandlerAdapter {
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-        log.debug("close connection from LOCAL[{}] to BROWSER[{}]", Context.LOCAL_PORT, localChannel.remoteAddress());
+        log.debug("close connection from LOCAL[{}] to BROWSER[{}]", port, localChannel.remoteAddress());
         ReleaseUtil.closeOnFlush(localChannel);
     }
 

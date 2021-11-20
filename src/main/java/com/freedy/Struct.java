@@ -1,13 +1,10 @@
 package com.freedy;
 
-import io.netty.channel.Channel;
-import io.netty.util.concurrent.Promise;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.io.Serializable;
 
 /**
  * 一个结构体的集合
@@ -20,14 +17,19 @@ public class Struct {
     /**
      * 内网穿透配置组信息
      */
-    public record ConfigGroup(
-            //本地需要穿透的服务的ip与端口
-            String localServerAddress, int localServerPort,
-            //远程服务器的ip与端口
-            String remoteAddress, int remotePort,
-            //远程服务器提供服务的端口
-            int remoteServerPort
-    ) {
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ConfigGroup implements Serializable {
+        //本地需要穿透的服务的ip与端口
+        private String localServerAddress;
+        private int localServerPort;
+        //远程服务器的ip与端口
+        private String remoteAddress;
+        private int remotePort;
+        //远程服务器提供服务的端口
+        private int remoteServerPort;
     }
 
     /**

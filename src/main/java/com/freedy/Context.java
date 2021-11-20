@@ -1,17 +1,20 @@
 package com.freedy;
 
+import com.freedy.intranetPenetration.local.ClientConnector;
+import com.freedy.intranetPenetration.remote.IntranetServer;
+import com.freedy.jumpProxy.local.LocalServer;
+import com.freedy.jumpProxy.remote.RemoteServer;
 import com.freedy.loadBalancing.LoadBalance;
 import com.freedy.loadBalancing.LoadBalanceFactory;
-import com.freedy.local.LocalServer;
-import com.freedy.remote.RemoteServer;
+import com.freedy.utils.ChannelUtils;
+import com.freedy.utils.EncryptUtil;
 import io.netty.channel.Channel;
 
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Locale;
-import java.util.Properties;
+import java.util.*;
+import java.util.concurrent.locks.LockSupport;
 
 /**
  * @author Freedy
@@ -19,39 +22,38 @@ import java.util.Properties;
  */
 public class Context {
     //本地服务端口号
-    public final static int LOCAL_PORT;
+    public final static int JUMP_LOCAL_PORT;
     //负载均衡
-    public final static LoadBalance<Struct.IpAddress> REMOTE_LB;
+    public final static LoadBalance<Struct.IpAddress> JUMP_REMOTE_LB;
     //远程服务端口号
-    public final static int REMOTE_PORT;
+    public final static int JUMP_REMOTE_PORT;
     //AES 加密KEY
     public final static String AES_KEY;
     //多次MD5加密
     public final static byte[] AUTHENTICATION;
     //反向代理端口
-    public final static int PROXY_PORT;
+    public final static int REVERSE_PROXY_PORT;
     //反向代理负载均衡器
-    public final static LoadBalance<Struct.IpAddress> PROXY_LB;
+    public final static LoadBalance<Struct.IpAddress> REVERSE_PROXY_LB;
 
 
-    public final static int INTRANET_REMOTE_PORT=8888;
+    public final static int INTRANET_REMOTE_PORT;
     //内网穿透每组所缓存的管道数量
-    public final static int INTRANET_CHANNEL_CACHE_SIZE = 30;
+    public final static int INTRANET_CHANNEL_CACHE_SIZE;
     //内网穿透配置组
-    public final static Struct.ConfigGroup[] INTRANET_GROUPS = {new Struct.ConfigGroup(
-            "127.0.0.1", 4567, 
-            "127.0.0.1", 8888,
-            9090
-    )};
+    public final static Struct.ConfigGroup[] INTRANET_GROUPS;
 
-    public final static String PORT_CHANNEL_CACHE_LB_NAME = "Round Robin";
-    public final static int INTRANET_CHANNEL_RETRY_TIME = 3;
+    public final static String PORT_CHANNEL_CACHE_LB_NAME;
+
+    public final static int INTRANET_CHANNEL_RETRY_TIMES = 3;
     //读空闲次数
     public final static int INTRANET_READER_IDLE_TIMES = 5;
     //读超时时间
     public final static int INTRANET_READER_IDLE_TIME = 5;
     //连接失败次数
-    public final static int INTRANET_MAX_BAD_CONNECT_TIMES=90;
+    public final static int INTRANET_MAX_BAD_CONNECT_TIMES = 90;
+
+    public final static int HTTP_PROXY_PORT;
 
     //换行符
     public final static String LF = System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("win") ? "\r\n" : "\n";
@@ -85,65 +87,140 @@ public class Context {
         }
 
         //启动本地转发服务
-        if (properties.getProperty("local.start","null").equals("true")) {
-            LOCAL_PORT = Integer.parseInt(properties.getProperty("local.server.port"));
-            REMOTE_LB = LoadBalanceFactory.produceByAddressAndName(
-                    properties.getProperty("local.connect.address").split(","),
-                    properties.getProperty("local.loadBalancing.algorithm")
+        if (properties.getProperty("jump.local.start","null").equals("true")) {
+            JUMP_LOCAL_PORT = Integer.parseInt(properties.getProperty("jump.local.server.port"));
+            JUMP_REMOTE_LB = LoadBalanceFactory.produceByAddressAndName(
+                    properties.getProperty("jump.local.connect.address").split(","),
+                    properties.getProperty("jump.local.loadBalancing.algorithm")
             );
-            System.out.println("远程服务地址:" + properties.getProperty("local.connect.address"));
-            System.out.println("负载均衡算法:" + properties.getProperty("local.loadBalancing.algorithm"));
+            System.out.println("初始化跳跃Http(redirect server)代理");
+            System.out.println("远程服务地址:" + properties.getProperty("jump.local.connect.address"));
+            System.out.println("负载均衡算法:" + properties.getProperty("jump.local.loadBalancing.algorithm"));
         } else {
-            LOCAL_PORT = -1;
-            REMOTE_LB = null;
+            JUMP_LOCAL_PORT = -1;
+            JUMP_REMOTE_LB = null;
         }
 
         //启动远程代理服务
-        if (properties.getProperty("remote.start","null").equals("true")) {
-            REMOTE_PORT = Integer.parseInt(properties.getProperty("remote.server.port"));
+        if (properties.getProperty("jump.remote.start","null").equals("true")) {
+            JUMP_REMOTE_PORT = Integer.parseInt(properties.getProperty("jump.remote.server.port"));
+            System.out.println("初始化跳跃Http(remote proxy server)代理");
         } else {
-            REMOTE_PORT = -1;
+            JUMP_REMOTE_PORT = -1;
         }
 
         //反向代理服务
-        if (properties.getProperty("proxy.start","null").equals("true")) {
-            PROXY_PORT = Integer.parseInt(properties.getProperty("proxy.port"));
-            PROXY_LB = LoadBalanceFactory.produceByAddressAndName(
-                    properties.getProperty("proxy.server.address").split(","),
-                    properties.getProperty("proxy.loadBalancing.algorithm")
+        if (properties.getProperty("reverse.proxy.start","null").equals("true")) {
+            REVERSE_PROXY_PORT = Integer.parseInt(properties.getProperty("reverse.proxy.port"));
+            REVERSE_PROXY_LB = LoadBalanceFactory.produceByAddressAndName(
+                    properties.getProperty("reverse.proxy.server.address").split(","),
+                    properties.getProperty("reverse.proxy.loadBalancing.algorithm")
             );
-            System.out.println("反向负载地址:" + properties.getProperty("proxy.server.address"));
-            System.out.println("负载均衡算法:" + properties.getProperty("proxy.loadBalancing.algorithm"));
+            System.out.println("初始化反向代理服务器配置");
+            System.out.println("反向负载地址:" + properties.getProperty("reverse.proxy.server.address"));
+            System.out.println("负载均衡算法:" + properties.getProperty("reverse.proxy.loadBalancing.algorithm"));
         } else {
-            PROXY_PORT = -1;
-            PROXY_LB = null;
+            REVERSE_PROXY_PORT = -1;
+            REVERSE_PROXY_LB = null;
         }
 
+        //内网穿透客户端
+        if (properties.getProperty("intranet.local.start", "null").equals("true")) {
+            INTRANET_CHANNEL_CACHE_SIZE =
+                    Integer.parseInt(properties.getProperty("intranet.local.cache.channel.size", "30"));
+            String[] a = properties.getProperty("intranet.local.group.localServerAddress", "null").split(",");
+            String[] b = properties.getProperty("intranet.local.group.remoteIntranetAddress", "null").split(",");
+            String[] c = properties.getProperty("intranet.local.group.remoteServerPort", "null").split(",");
+            int length = a.length;
+            if (length != b.length || length != c.length) {
+                throw new IllegalArgumentException("The length values of the three values(intranet.local.group) are not equal");
+            }
+            if (a[0].equals("null")) throw new IllegalArgumentException("You should config intranet.local.group first");
+
+            Struct.ConfigGroup[] groups = new Struct.ConfigGroup[length];
+
+            for (int i = 0; i < length; i++) {
+                Struct.ConfigGroup group = new Struct.ConfigGroup();
+                Struct.IpAddress localServerAddress = ChannelUtils.parseAddress(a[i]);
+                if (localServerAddress == null) throw new IllegalArgumentException("Illegal intranet.local.group.localServerAddress:" + a[i]);
+                group.setLocalServerAddress(localServerAddress.address());
+                group.setLocalServerPort(localServerAddress.port());
+
+                Struct.IpAddress remoteIntranetAddress = ChannelUtils.parseAddress(b[i]);
+                if (remoteIntranetAddress == null) throw new IllegalArgumentException("Illegal intranet.local.group.remoteIntranetAddress:" + b[i]);
+                group.setRemoteAddress(remoteIntranetAddress.address());
+                group.setRemotePort(remoteIntranetAddress.port());
+
+                try {
+                    group.setRemoteServerPort(Integer.parseInt(c[i]));
+                }catch (NumberFormatException e){
+                    throw new IllegalArgumentException("Illegal intranet.local.group.remoteServerPort:" + c[i]);
+                }
+                groups[i]=group;
+            }
+            INTRANET_GROUPS=groups;
+            System.out.println("初始化内网穿透(client)配置");
+            System.out.println("管道池中管道的数量:"+INTRANET_CHANNEL_CACHE_SIZE);
+            System.out.println("分组配置");
+            for (Struct.ConfigGroup group : groups) {
+                System.out.println(group);
+            }
+        }else {
+            INTRANET_GROUPS=null;
+            INTRANET_CHANNEL_CACHE_SIZE=-1;
+        }
+
+        //内网穿透服务端
+        if (properties.getProperty("intranet.remote.start", "null").equals("true")) {
+            INTRANET_REMOTE_PORT=Integer.parseInt(properties.getProperty("intranet.remote.port","null"));
+            PORT_CHANNEL_CACHE_LB_NAME=properties.getProperty("intranet.remote.channel.loadBalancing","Round Robin");
+            System.out.println("初始化内网穿透(server)配置");
+            System.out.println("管道负载均衡算法:"+PORT_CHANNEL_CACHE_LB_NAME);
+        }else {
+            INTRANET_REMOTE_PORT=-1;
+            PORT_CHANNEL_CACHE_LB_NAME=null;
+        }
+
+        if (properties.getProperty("proxy.start","null").equals("true")) {
+            HTTP_PROXY_PORT = Integer.parseInt(properties.getProperty("proxy.port"));
+            System.out.println("初始化内HTTP代理服务器配置");
+        } else {
+            HTTP_PROXY_PORT = -1;
+        }
     }
 
+
     public static void main(String[] args) throws Exception {
+        Configuration configuration = new CMDParamParser(args).parse();
+        propertiesPath = configuration.getPropertiesPath();
 
-        ArrayList<Channel> channelList = new ArrayList<>();
-        if (LOCAL_PORT != -1) {
-            Channel channel = LocalServer.start(LOCAL_PORT, REMOTE_LB, false);
-            channelList.add(channel);
+        Map<String, Channel> nameChannelMap=new HashMap<>();
+
+        if (configuration.isStartLocalJumpHttpProxy()&&JUMP_LOCAL_PORT != -1) {
+            Channel channel = LocalServer.start(JUMP_LOCAL_PORT, JUMP_REMOTE_LB, false);
+            nameChannelMap.put("JUMP_LOCAL_SERVER",channel);
         }
-        if (REMOTE_PORT != -1) {
-            Channel channel = RemoteServer.start();
-            channelList.add(channel);
+        if (configuration.isStartRemoteJumpHttpProxy()&&JUMP_REMOTE_PORT != -1) {
+            Channel channel = RemoteServer.start(JUMP_REMOTE_PORT);
+            nameChannelMap.put("JUMP_REMOTE_SERVER",channel);
         }
-        if (PROXY_PORT != -1) {
-            Channel channel = LocalServer.start(PROXY_PORT, PROXY_LB, true);
-            channelList.add(channel);
+        if (configuration.isStartReverseProxy()&&REVERSE_PROXY_PORT != -1) {
+            Channel channel = LocalServer.start(REVERSE_PROXY_PORT, REVERSE_PROXY_LB, true);
+            nameChannelMap.put("REVERSE_PROXY_SERVER",channel);
+        }
+        if (configuration.isStartHttpProxy()&&HTTP_PROXY_PORT != -1) {
+            Channel channel = RemoteServer.start(HTTP_PROXY_PORT);
+            nameChannelMap.put("HTTP_PROXY_SERVER",channel);
+        }
+        if (configuration.isStartLocalIntranet()&&INTRANET_CHANNEL_CACHE_SIZE!=-1){
+            ClientConnector.start().addListener(channel -> nameChannelMap.put("INTRANET_LOCAL_SERVER",channel));
+        }
+        if (configuration.isStartRemoteIntranet()&&INTRANET_REMOTE_PORT!=-1){
+            Channel channel = IntranetServer.start();
+            nameChannelMap.put("INTRANET_REMOTE_SERVER",channel);
         }
 
-        channelList.forEach(channel -> {
-            try {
-                channel.closeFuture().sync();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        });
+        LockSupport.park();
     }
 
 }
