@@ -11,8 +11,11 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import lombok.extern.slf4j.Slf4j;
 
+import java.lang.reflect.Field;
 import java.util.Map;
+import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * @author Freedy
@@ -23,13 +26,15 @@ public class RequestReceiver extends ChannelInboundHandlerAdapter {
 
     private final LoadBalance<Channel> lb;
     private Channel intranetChannel;
-    private int retryCount=0;
-    private int changeTimes=0;
-    public static final Map<Channel,Channel> intranetReceiverMap=new ConcurrentHashMap<>();
-    public static final Map<Channel,Channel> receiverIntranetMap=new ConcurrentHashMap<>();
+    private int retryCount = 0;
+    private int changeTimes = 0;
+    public static final Map<Channel, Channel> intranetReceiverMap = new ConcurrentHashMap<>();
+    public static final Map<Channel, Channel> receiverIntranetMap = new ConcurrentHashMap<>();
+
+
 
     public RequestReceiver(int remotePort) {
-        lb=ChanelWarehouse.PORT_CHANNEL_CACHE.get(remotePort);
+        lb = ChanelWarehouse.PORT_CHANNEL_CACHE.get(remotePort);
     }
 
     @Override
@@ -38,7 +43,7 @@ public class RequestReceiver extends ChannelInboundHandlerAdapter {
         if (intranetChannel != null) {
             //打印日志
             Struct.ConfigGroup group = ChannelUtils.getGroup(intranetChannel);
-            log.info("Redirect {} to {} for request {}", ctx.channel().remoteAddress().toString().substring(1), intranetChannel.remoteAddress().toString().substring(1), group.getLocalServerAddress() + ":" + group.getLocalServerPort());
+            log.info("[INTRANET-REMOTE-PROXY]: Preparing to redirect {} to {} for request {}", ctx.channel().remoteAddress().toString().substring(1), intranetChannel.remoteAddress().toString().substring(1), group.getLocalServerAddress() + ":" + group.getLocalServerPort());
         }
 
     }
@@ -54,22 +59,24 @@ public class RequestReceiver extends ChannelInboundHandlerAdapter {
             retryCount=0; // 重置连接失败次数
 
             OccupyState state = ChannelUtils.getOccupy(intranetChannel);
-            //System.out.println(state);
+
             if (state.tryOccupy(receiverChannel)){
+                OccupyState.inspectChannelState();
                 //转发信息
-                //System.out.println("转发消息");
                 intranetChannel.writeAndFlush(msg);
                 intranetReceiverMap.put(intranetChannel, receiverChannel);
                 receiverIntranetMap.put(receiverChannel, intranetChannel);
             }else {         //管道繁忙，尝试其他管道
                 if (changeTimes >= lb.size()) {
                     //提交一个任务 等待其他的任务执行完
-                    //System.out.println("提交一个任务 等待其他的任务执行完");
-                    state.submitTask(new ForwardTask());
+
+                    state.submitTask(new ForwardTask(receiverChannel, msg));
                     changeTimes = 0;
+                    OccupyState.inspectChannelState();
+                    return;
                 }
+
                 //切换管道
-                //System.out.println("管道繁忙,切换管道");
                 intranetChannel = lb.getElement();
                 changeTimes++;
                 channelRead(ctx, msg);
@@ -77,21 +84,25 @@ public class RequestReceiver extends ChannelInboundHandlerAdapter {
         }else {
             if (retryCount >= lb.size()) {
                 //尝试失败次数大于临界值
-                //System.out.println("尝试失败次数大于临界值");
                 ErrorHandler.handle(ctx, msg);
             }
             retryCount++;
             //切换管道
-            //System.out.println("管道被关闭,切换管道");
             intranetChannel = lb.getElement();
-            channelRead(ctx,msg);
+            channelRead(ctx, msg);
         }
-
     }
+
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
         if (intranetChannel != null)
             ChannelUtils.getOccupy(intranetChannel).release(ctx.channel());
+    }
+
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+//        cause.printStackTrace();
+        log.error("[EXCEPTION]: {}", cause.getMessage());
     }
 }

@@ -1,13 +1,13 @@
 package com.freedy.loadBalancing;
 
 
-import com.freedy.Struct;
 import lombok.Getter;
 import lombok.ToString;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * @author Freedy
@@ -15,49 +15,40 @@ import java.util.List;
  */
 @ToString
 public abstract class LoadBalance<T> {
-    protected List<Object> lbElement=new ArrayList<>();
-    protected int elementSize;
+    protected List<T> lbElement = new CopyOnWriteArrayList<>();
     @Getter
     protected Object[] attribute;
 
-    synchronized void loadAddress(String[] remoteAddress){
-        int length = remoteAddress.length;
-        this.lbElement=new ArrayList<>();
-        this.elementSize=length;
-        for (String address : remoteAddress) {
-            String[] split = address.split(":");
-            this.lbElement.add(new Struct.IpAddress(split[0], Integer.parseInt(split[1])));
-        }
+
+    public int size() {
+        return lbElement.size();
     }
 
-    public synchronized int size(){
-        return elementSize;
-    }
-
-    public synchronized void setElement(T[] element) {
+    public void setElement(T[] element) {
         this.lbElement.clear();
-        elementSize=0;
         this.lbElement.addAll(Arrays.asList(element));
     }
 
-    public synchronized void addElement(T element){
+    public void addElement(T element) {
         this.lbElement.add(element);
-        elementSize++;
     }
 
-    public synchronized void removeElement(T element){
-        if (lbElement.remove(element))
-            elementSize--;
+    public void removeElement(T element) {
+        lbElement.remove(element);
     }
 
     public T getElement() {
-        if (elementSize==0) return null;
         return supply();
+    }
+
+
+    public List<T> getAllSafely() {
+        return new ArrayList<>(lbElement);
     }
 
     public abstract T supply();
 
-    public synchronized void setAttributes(Object ...attr){
-        attribute=attr;
+    public void setAttributes(Object... attr) {
+        attribute = attr;
     }
 }

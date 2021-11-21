@@ -1,14 +1,15 @@
 package com.freedy.intranetPenetration.local;
 
+import com.freedy.AuthenticAndDecrypt;
+import com.freedy.AuthenticAndEncrypt;
 import com.freedy.Context;
 import com.freedy.Struct;
 import com.freedy.intranetPenetration.ChannelDaemonThread;
 import com.freedy.intranetPenetration.ParentChannelFuture;
 import com.freedy.intranetPenetration.remote.IntranetServer;
 import io.netty.bootstrap.Bootstrap;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelOption;
+import io.netty.buffer.ByteBuf;
+import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
@@ -19,11 +20,11 @@ import io.netty.handler.codec.serialization.ObjectEncoder;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import lombok.extern.slf4j.Slf4j;
 
+import java.nio.charset.Charset;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.FutureTask;
 import java.util.concurrent.locks.LockSupport;
 
 /**
@@ -81,12 +82,20 @@ public class ClientConnector {
             Channel channel = bootstrap.connect(group.getRemoteAddress(), group.getRemotePort()).sync().channel();
             channel.pipeline().addLast(
                     new LengthFieldBasedFrameDecoder(Integer.MAX_VALUE, 0, 4, 0, 4),
-                    new LengthFieldPrepender(4),
+                    new LengthFieldPrepender(4)
+            );
+            if (Context.AES_KEY != null) {
+                channel.pipeline().addLast(
+                        new AuthenticAndDecrypt(),
+                        new AuthenticAndEncrypt()
+                );
+            }
+            channel.pipeline().addLast(
                     new ObjectEncoder(),
                     new ObjectDecoder(ClassResolvers.cacheDisabled(IntranetServer.class.getClassLoader())),
                     new ClientHandshake(group)
             );
-            log.debug("[client]发送配置消息[{}]",group);
+            log.debug("[client]发送配置消息[{}]", group);
             channel.writeAndFlush(group);
 
             List<Channel> list = remoteChannelMap.get(group);
@@ -111,7 +120,9 @@ public class ClientConnector {
     public static Channel localServerConnect(Struct.ConfigGroup group,Channel remoteChannel) {
         try {
             Channel channel = bootstrap.connect(group.getLocalServerAddress(), group.getLocalServerPort()).sync().channel();
-            channel.pipeline().addLast(new ResponseForward(remoteChannel));
+            channel.pipeline().addLast(
+                    new ResponseForward(remoteChannel)
+            );
             return channel;
         } catch (InterruptedException e) {
             log.error("[EXCEPTION]: {}", e.getMessage());

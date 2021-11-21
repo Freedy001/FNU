@@ -58,10 +58,11 @@ public class Context {
     //换行符
     public final static String LF = System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("win") ? "\r\n" : "\n";
     //properties
-    private static String propertiesPath;
+    static String propertiesPath;
 
     static {
         Properties properties = new Properties();
+
 
         try {
             properties.load(propertiesPath != null ? new FileInputStream(propertiesPath) :
@@ -187,40 +188,6 @@ public class Context {
         } else {
             HTTP_PROXY_PORT = -1;
         }
-    }
-
-
-    public static void main(String[] args) throws Exception {
-        Configuration configuration = new CMDParamParser(args).parse();
-        propertiesPath = configuration.getPropertiesPath();
-
-        Map<String, Channel> nameChannelMap=new HashMap<>();
-
-        if (configuration.isStartLocalJumpHttpProxy()&&JUMP_LOCAL_PORT != -1) {
-            Channel channel = LocalServer.start(JUMP_LOCAL_PORT, JUMP_REMOTE_LB, false);
-            nameChannelMap.put("JUMP_LOCAL_SERVER",channel);
-        }
-        if (configuration.isStartRemoteJumpHttpProxy()&&JUMP_REMOTE_PORT != -1) {
-            Channel channel = RemoteServer.start(JUMP_REMOTE_PORT);
-            nameChannelMap.put("JUMP_REMOTE_SERVER",channel);
-        }
-        if (configuration.isStartReverseProxy()&&REVERSE_PROXY_PORT != -1) {
-            Channel channel = LocalServer.start(REVERSE_PROXY_PORT, REVERSE_PROXY_LB, true);
-            nameChannelMap.put("REVERSE_PROXY_SERVER",channel);
-        }
-        if (configuration.isStartHttpProxy()&&HTTP_PROXY_PORT != -1) {
-            Channel channel = RemoteServer.start(HTTP_PROXY_PORT);
-            nameChannelMap.put("HTTP_PROXY_SERVER",channel);
-        }
-        if (configuration.isStartLocalIntranet()&&INTRANET_CHANNEL_CACHE_SIZE!=-1){
-            ClientConnector.start().addListener(channel -> nameChannelMap.put("INTRANET_LOCAL_SERVER",channel));
-        }
-        if (configuration.isStartRemoteIntranet()&&INTRANET_REMOTE_PORT!=-1){
-            Channel channel = IntranetServer.start();
-            nameChannelMap.put("INTRANET_REMOTE_SERVER",channel);
-        }
-
-        LockSupport.park();
     }
 
 }

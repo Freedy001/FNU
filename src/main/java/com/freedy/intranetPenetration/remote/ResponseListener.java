@@ -26,7 +26,7 @@ public class ResponseListener extends ChannelInboundHandlerAdapter {
         if (receiverChannel.isActive()){
             receiverChannel.writeAndFlush(msg);
         }else {
-            log.info("A message will be discarded,because the receiverChannel is not active!");
+            log.warn("A message will be discarded,because the receiverChannel is not active!");
             ReleaseUtil.release(msg);
         }
     }

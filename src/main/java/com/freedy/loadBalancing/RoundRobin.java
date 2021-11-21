@@ -13,9 +13,8 @@ public class RoundRobin<T> extends LoadBalance<T> {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
-    public synchronized T supply() {
-        return (T)lbElement.get(index++ % elementSize);
+    public T supply() {
+        return lbElement.get(index++ % lbElement.size());
     }
 
 }

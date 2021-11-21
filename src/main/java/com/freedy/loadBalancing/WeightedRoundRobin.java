@@ -10,7 +10,7 @@ public class WeightedRoundRobin<T> extends LoadBalance<T>{
     }
 
     @Override
-    public synchronized T supply() {
+    public T supply() {
         return null;
     }
 }

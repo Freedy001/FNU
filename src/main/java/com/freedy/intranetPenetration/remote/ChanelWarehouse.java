@@ -27,19 +27,22 @@ public class ChanelWarehouse extends SimpleChannelInboundHandler<Struct.ConfigGr
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, Struct.ConfigGroup group) {
-        log.debug("[server]接收配置消息[{}]",group);
+        log.debug("[server]接收配置消息[{}]", group);
         Channel channel = ctx.channel();
         //初始化 管道池
         int serverPort = group.getRemoteServerPort();
         LoadBalance<Channel> loadBalance = ChanelWarehouse.PORT_CHANNEL_CACHE.get(serverPort);
+        createLB:
         if (loadBalance == null) {
-            assert Context.PORT_CHANNEL_CACHE_LB_NAME != null;
-            loadBalance = LoadBalanceFactory.produce(Context.PORT_CHANNEL_CACHE_LB_NAME);
-            ChanelWarehouse.PORT_CHANNEL_CACHE.put(serverPort, loadBalance);
+            synchronized (PORT_CHANNEL_CACHE) {
+                if ((loadBalance = ChanelWarehouse.PORT_CHANNEL_CACHE.get(serverPort)) != null) break createLB;
+                assert Context.PORT_CHANNEL_CACHE_LB_NAME != null;
+                loadBalance = LoadBalanceFactory.produce(Context.PORT_CHANNEL_CACHE_LB_NAME);
+                ChanelWarehouse.PORT_CHANNEL_CACHE.put(serverPort, loadBalance);
+            }
         }
         loadBalance.addElement(channel);
-        ChannelUtils.setOccupy(channel,new OccupyState());
-        ChannelUtils.setGroup(channel,group);
+        ChannelUtils.setOccupy(channel, new OccupyState(channel,group));
 
         channel.writeAndFlush(Protocol.ACK);
         log.debug("[server]发送ACK");

@@ -12,11 +12,10 @@ public class SourceIPHash<T> extends LoadBalance<T> {
     SourceIPHash() { }
 
     @Override
-    @SuppressWarnings("unchecked")
     public T supply() {
         if (attribute[0] instanceof Channel channel) {
             int hash = hash(channel.remoteAddress().toString());
-            return (T)lbElement.get(hash % elementSize);
+            return (T)lbElement.get(hash % lbElement.size());
         } else {
             throw new IllegalArgumentException("Illegal attr! Need attr which type is io.netty.channel.Channel,please check your attr.");
         }

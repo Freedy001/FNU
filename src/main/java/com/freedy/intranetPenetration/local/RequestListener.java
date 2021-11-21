@@ -23,6 +23,8 @@ public class RequestListener extends ChannelInboundHandlerAdapter {
     public void channelActive(ChannelHandlerContext ctx) {
         Channel remoteChannel = ctx.channel();
         localServerChannel = ClientConnector.localServerConnect(ChannelUtils.getGroup(remoteChannel), remoteChannel);
+        if (localServerChannel != null)
+            log.info("[INTRANET-LOCAL-SERVER]: Preparing to connect to the localServer[{}] for remoteServer[{}]", localServerChannel.remoteAddress().toString().substring(1), remoteChannel.remoteAddress().toString().substring(1));
     }
 
 

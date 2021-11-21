@@ -54,8 +54,7 @@ public class ServerHandshake extends SimpleChannelInboundHandler<String> {
                 });
 
             }
-
-            Struct.ConfigGroup group = ChannelUtils.getGroup(channel);
+            Struct.ConfigGroup group = ChannelUtils.getOccupy(channel).getGroup();
             final int remoteServerPort = group.getRemoteServerPort();
             if (PORT_STARTED.put(remoteServerPort, fakeChannel)==null) {
                 //启动服务

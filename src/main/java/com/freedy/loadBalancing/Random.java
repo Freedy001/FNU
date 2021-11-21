@@ -11,8 +11,7 @@ public class Random<T> extends LoadBalance<T> {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
-    public synchronized T supply() {
-        return (T)lbElement.get((int) (Math.random() * 65025) % elementSize);
+    public T supply() {
+        return lbElement.get((int) (Math.random() * 65025) % lbElement.size());
     }
 }
