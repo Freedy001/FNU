@@ -22,6 +22,9 @@ import java.nio.charset.Charset;
 public class IntranetServer {
     public static final NioEventLoopGroup workGroup = new NioEventLoopGroup(0,new DefaultThreadFactory("intranet-server-worker"));
 
+    public static void main(String[] args) throws Exception{
+        start();
+    }
 
     public static Channel start() throws InterruptedException {
         ServerBootstrap bootstrap = new ServerBootstrap();

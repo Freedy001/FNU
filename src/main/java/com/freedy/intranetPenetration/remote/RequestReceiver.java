@@ -91,6 +91,7 @@ public class RequestReceiver extends ChannelInboundHandlerAdapter {
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-        ChannelUtils.getOccupy(intranetChannel).release(ctx.channel());
+        if (intranetChannel != null)
+            ChannelUtils.getOccupy(intranetChannel).release(ctx.channel());
     }
 }

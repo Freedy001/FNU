@@ -82,7 +82,7 @@ public class HeartBeatHandler extends ChannelInboundHandlerAdapter {
     @Override
     public void channelInactive(ChannelHandlerContext ctx) {
         Channel channel = ctx.channel();
-        log.debug("管道被关闭: {}",channel.toString());
+        log.debug("关闭管道: {}",channel.toString());
         Struct.ConfigGroup group = ChannelUtils.getGroup(channel);
         ClientConnector.remoteChannelMap.get(group).remove(channel);
     }

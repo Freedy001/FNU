@@ -35,7 +35,7 @@ public class ChannelDaemonThread extends TimerTask {
                     int size = channelList.size();
                     Integer bConn = Optional.ofNullable(groupBadConnectTimes.get(group)).orElse(0);
                     if (bConn > Context.INTRANET_MAX_BAD_CONNECT_TIMES) {
-                        log.info("bad-connection[{}] has exceed the max bad-connect times[{}]", bConn, Context.INTRANET_MAX_BAD_CONNECT_TIMES);
+                        log.warn("bad-connection[{}] has exceed the max bad-connect times[{}]", bConn, Context.INTRANET_MAX_BAD_CONNECT_TIMES);
                         if (size == 0) {
                             //只建立一次试探性连接
                             if (!ClientConnector.initConnection(group)) {
@@ -48,7 +48,7 @@ public class ChannelDaemonThread extends TimerTask {
 
                     int expect = Context.INTRANET_CHANNEL_CACHE_SIZE;
                     if (size < expect) {
-                        log.info("connection[{}] less than expectation[{}],ready to extend connection", size, expect);
+                        log.warn("connection[{}] less than expectation[{}],ready to extend connection", size, expect);
                         for (int i = size; i < expect; i++) {
                             //需要重新建立管道连接
                             if (!ClientConnector.initConnection(group)) {

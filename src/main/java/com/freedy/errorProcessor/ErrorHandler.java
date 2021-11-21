@@ -39,9 +39,10 @@ public class ErrorHandler {
         channel.pipeline().addLast(new HttpResponseEncoder());
         DefaultFullHttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NOT_FOUND);
 
-        response.headers().set(CONTENT_TYPE, "text/plain");
+        response.headers().set(CONTENT_TYPE, "text/html");
         response.headers().set(CONTENT_LENGTH, errPage.length);
         response.content().writeBytes(errPage);
+        channel.writeAndFlush(response);
         ReleaseUtil.release(msg);
         ReleaseUtil.closeOnFlush(channel);
     }

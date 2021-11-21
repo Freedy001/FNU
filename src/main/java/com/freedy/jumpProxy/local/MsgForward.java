@@ -4,6 +4,7 @@ import com.freedy.AuthenticAndDecrypt;
 import com.freedy.AuthenticAndEncrypt;
 import com.freedy.Context;
 import com.freedy.Struct;
+import com.freedy.errorProcessor.ErrorHandler;
 import com.freedy.loadBalancing.LoadBalance;
 import com.freedy.utils.ReleaseUtil;
 import io.netty.bootstrap.Bootstrap;
@@ -80,9 +81,7 @@ public class MsgForward extends ChannelInboundHandlerAdapter {
         Channel localChannel = ctx.channel();
         connectFuture.addListener(future -> {
             if (!future.isSuccess()) {
-                localChannel.writeAndFlush(Unpooled.copiedBuffer("HTTP/1.1 500 Internal Server Error".getBytes(StandardCharsets.UTF_8)));
-                ReleaseUtil.closeOnFlush(localChannel);
-                ReleaseUtil.release(msg);
+                ErrorHandler.handle(ctx,msg);
                 return;
             }
             Channel remoteChannel = connectFuture.channel();

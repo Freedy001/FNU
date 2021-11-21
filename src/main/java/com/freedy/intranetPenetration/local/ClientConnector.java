@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.FutureTask;
+import java.util.concurrent.locks.LockSupport;
 
 /**
  * @author Freedy
@@ -35,6 +36,10 @@ public class ClientConnector {
     private final static Bootstrap bootstrap = new Bootstrap();
     public final static Map<Struct.ConfigGroup, List<Channel>> remoteChannelMap = new ConcurrentHashMap<>();
 
+    public static void main(String[] args) {
+        ClientConnector.start();
+        LockSupport.park();
+    }
 
     public static ParentChannelFuture start() {
         final ParentChannelFuture future = new ParentChannelFuture();
