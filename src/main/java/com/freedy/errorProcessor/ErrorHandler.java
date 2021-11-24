@@ -1,6 +1,6 @@
 package com.freedy.errorProcessor;
 
-import com.freedy.Protocol;
+import com.freedy.intranetPenetration.Protocol;
 import com.freedy.utils.ChannelUtils;
 import com.freedy.utils.ReleaseUtil;
 import io.netty.channel.Channel;
@@ -35,7 +35,10 @@ public class ErrorHandler {
     }
 
     public static void handle(ChannelHandlerContext ctx, Object msg) {
-        Channel channel = ctx.channel();
+        handle(ctx.channel(), msg);
+    }
+
+    public static void handle(Channel channel, Object msg) {
         channel.pipeline().addLast(new HttpResponseEncoder());
         DefaultFullHttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NOT_FOUND);
 
@@ -47,8 +50,8 @@ public class ErrorHandler {
         ReleaseUtil.closeOnFlush(channel);
     }
 
-    public static void LocalServerErr(ChannelHandlerContext ctx, Object msg){
-        ChannelUtils.sendString(ctx, Protocol.HEARTBEAT_LOCAL_ERROR_MSG);
+    public static void LocalServerErr(ChannelHandlerContext ctx, Object msg) {
+        ChannelUtils.setCmdAndSend(ctx.channel(), Protocol.HEARTBEAT_LOCAL_ERROR_MSG);
         ReleaseUtil.release(msg);
     }
 

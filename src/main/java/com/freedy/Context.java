@@ -1,20 +1,15 @@
 package com.freedy;
 
-import com.freedy.intranetPenetration.local.ClientConnector;
-import com.freedy.intranetPenetration.remote.IntranetServer;
-import com.freedy.jumpProxy.local.LocalServer;
-import com.freedy.jumpProxy.remote.RemoteServer;
 import com.freedy.loadBalancing.LoadBalance;
 import com.freedy.loadBalancing.LoadBalanceFactory;
 import com.freedy.utils.ChannelUtils;
 import com.freedy.utils.EncryptUtil;
-import io.netty.channel.Channel;
 
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
-import java.util.concurrent.locks.LockSupport;
+import java.util.Locale;
+import java.util.Properties;
 
 /**
  * @author Freedy
@@ -38,22 +33,26 @@ public class Context {
 
 
     public final static int INTRANET_REMOTE_PORT;
-    //内网穿透每组所缓存的管道数量
-    public final static int INTRANET_CHANNEL_CACHE_SIZE;
+    //内网穿透每组所缓存的管道最小数量
+    public final static int INTRANET_CHANNEL_CACHE_MIN_SIZE;
+    //内网穿透每组所缓存的管道最大数量
+    public final static int INTRANET_CHANNEL_CACHE_MAX_SIZE;
     //内网穿透配置组
     public final static Struct.ConfigGroup[] INTRANET_GROUPS;
 
     public final static String PORT_CHANNEL_CACHE_LB_NAME;
-
+    //连接本地服务器失败次数
     public final static int INTRANET_CHANNEL_RETRY_TIMES = 3;
     //读空闲次数
     public final static int INTRANET_READER_IDLE_TIMES = 5;
     //读超时时间
-    public final static int INTRANET_READER_IDLE_TIME = 5;
+    public final static int INTRANET_READER_IDLE_TIME = 100000000;
     //连接失败次数
     public final static int INTRANET_MAX_BAD_CONNECT_TIMES = 90;
 
     public final static int HTTP_PROXY_PORT;
+
+    public final static int CMD_LENGTH = 28;
 
     //换行符
     public final static String LF = System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("win") ? "\r\n" : "\n";
@@ -84,7 +83,7 @@ public class Context {
             System.out.println("认证加密次数:" + times);
         } else {
             AES_KEY = null;
-            AUTHENTICATION = null;
+            AUTHENTICATION = EncryptUtil.stringToMD5("AUTHENTICATION").getBytes(StandardCharsets.UTF_8);
         }
 
         //启动本地转发服务
@@ -127,8 +126,10 @@ public class Context {
 
         //内网穿透客户端
         if (properties.getProperty("intranet.local.start", "null").equals("true")) {
-            INTRANET_CHANNEL_CACHE_SIZE =
-                    Integer.parseInt(properties.getProperty("intranet.local.cache.channel.size", "30"));
+            INTRANET_CHANNEL_CACHE_MIN_SIZE =
+                    Integer.parseInt(properties.getProperty("intranet.local.cache.channel.minSize", "30"));
+            INTRANET_CHANNEL_CACHE_MAX_SIZE =
+                    Integer.parseInt(properties.getProperty("intranet.local.cache.channel.maxSize", "5000"));
             String[] a = properties.getProperty("intranet.local.group.localServerAddress", "null").split(",");
             String[] b = properties.getProperty("intranet.local.group.remoteIntranetAddress", "null").split(",");
             String[] c = properties.getProperty("intranet.local.group.remoteServerPort", "null").split(",");
@@ -161,14 +162,15 @@ public class Context {
             }
             INTRANET_GROUPS=groups;
             System.out.println("初始化内网穿透(client)配置");
-            System.out.println("管道池中管道的数量:"+INTRANET_CHANNEL_CACHE_SIZE);
+            System.out.println("管道池中管道的数量:" + INTRANET_CHANNEL_CACHE_MIN_SIZE);
             System.out.println("分组配置");
             for (Struct.ConfigGroup group : groups) {
                 System.out.println(group);
             }
         }else {
-            INTRANET_GROUPS=null;
-            INTRANET_CHANNEL_CACHE_SIZE=-1;
+            INTRANET_GROUPS = null;
+            INTRANET_CHANNEL_CACHE_MIN_SIZE = -1;
+            INTRANET_CHANNEL_CACHE_MAX_SIZE = -1;
         }
 
         //内网穿透服务端

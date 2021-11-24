@@ -1,13 +1,9 @@
 package com.freedy.intranetPenetration.remote;
 
 import com.freedy.Context;
-import com.freedy.Protocol;
-import com.freedy.intranetPenetration.ForwardTask;
-import com.freedy.intranetPenetration.OccupyState;
+import com.freedy.intranetPenetration.Protocol;
 import com.freedy.loadBalancing.LoadBalance;
 import com.freedy.utils.ChannelUtils;
-import com.freedy.utils.ReleaseUtil;
-import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
@@ -15,13 +11,7 @@ import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import lombok.extern.slf4j.Slf4j;
 
-import java.lang.reflect.Field;
 import java.net.ConnectException;
-import java.nio.charset.Charset;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Queue;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 处理客户端心跳
@@ -32,26 +22,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @Slf4j
 public class HeartBeatHandler extends ChannelInboundHandlerAdapter {
 
-
     int readIdleTimes = 0;
 
-
-    @Override
-    public void channelRead(ChannelHandlerContext ctx, Object msg) {
-        if (!isHeartBeatPack(ctx, (ByteBuf) msg)) {
-            ctx.fireChannelRead(msg);
-        }
-    }
-
-    private boolean isHeartBeatPack(ChannelHandlerContext ctx, ByteBuf msg) {
-        String info = msg.toString(Charset.defaultCharset());
-        if (info.startsWith(Protocol.HEARTBEAT_LOCAL_NORMAL_MSG)) {
-            ChannelUtils.sendString(ctx.channel(), Protocol.HEARTBEAT_REMOTE_NORMAL_MSG);
-            ReleaseUtil.release(msg);
-            return true;
-        }
-        return false;
-    }
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) {
@@ -77,6 +49,7 @@ public class HeartBeatHandler extends ChannelInboundHandlerAdapter {
             }
 
             if (readIdleTimes >= Context.INTRANET_READER_IDLE_TIMES) {
+                readIdleTimes = 0;
                 requireNewChannelAndDeleteOld(ctx);
             }
         } else {
@@ -91,11 +64,13 @@ public class HeartBeatHandler extends ChannelInboundHandlerAdapter {
         balance.removeElement(localChannel);
         localChannel.close();
         log.info("[INTRANET-REMOTE-SERVER]: 关闭管道({})", localChannel);
+        //如果该管道是服务端主动销毁，则不需要发送检测消息
+        if (ChannelUtils.getDestroyState(localChannel)) return;
         //通过下一个channel像客户端索要一个新的channel
         Channel nextChannel = balance.getElement();
         if (nextChannel == null) {
             return;
         }
-        ChannelUtils.sendString(nextChannel, Protocol.HEARTBEAT_REMOTE_ERROR_MSG + localChannel.remoteAddress().toString());
+        ChannelUtils.setCmdAndSend(nextChannel, Protocol.HEARTBEAT_REMOTE_ERROR_MSG);
     }
 }

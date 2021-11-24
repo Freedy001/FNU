@@ -3,6 +3,7 @@ package com.freedy.intranetPenetration.remote;
 import com.freedy.AuthenticAndDecrypt;
 import com.freedy.AuthenticAndEncrypt;
 import com.freedy.Context;
+import com.freedy.intranetPenetration.Protocol;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
@@ -23,6 +24,7 @@ import io.netty.util.concurrent.DefaultThreadFactory;
 public class IntranetServer {
     public static final NioEventLoopGroup workGroup = new NioEventLoopGroup(0,new DefaultThreadFactory("intranet-server-worker"));
 
+
     public static void main(String[] args) throws Exception{
         start();
     }
@@ -40,15 +42,9 @@ public class IntranetServer {
                     protected void initChannel(Channel channel) throws Exception {
                         channel.pipeline().addLast(
                                 new LengthFieldBasedFrameDecoder(Integer.MAX_VALUE, 0, 4, 0, 4),
-                                new LengthFieldPrepender(4)
-                        );
-                        if (Context.AES_KEY != null) {
-                            channel.pipeline().addLast(
-                                    new AuthenticAndDecrypt(),
-                                    new AuthenticAndEncrypt()
-                            );
-                        }
-                        channel.pipeline().addLast(
+                                new LengthFieldPrepender(4),
+                                new AuthenticAndEncrypt(),
+                                new AuthenticAndDecrypt(Protocol::invokeHandler),
                                 new ObjectEncoder(),
                                 new ObjectDecoder(ClassResolvers.cacheDisabled(IntranetServer.class.getClassLoader())),
                                 new ChanelWarehouse(),

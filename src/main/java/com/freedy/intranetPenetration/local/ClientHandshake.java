@@ -1,8 +1,8 @@
 package com.freedy.intranetPenetration.local;
 
 import com.freedy.Context;
-import com.freedy.Protocol;
 import com.freedy.Struct;
+import com.freedy.intranetPenetration.Protocol;
 import com.freedy.utils.ChannelUtils;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
@@ -58,11 +58,14 @@ public class ClientHandshake extends SimpleChannelInboundHandler<String> {
                 channel.pipeline().remove(ObjectDecoder.class);
                 channel.pipeline().remove(ClientHandshake.class);
                 channel.pipeline().addLast(
-                        new IdleStateHandler(Context.INTRANET_READER_IDLE_TIME, 0, 0, TimeUnit.SECONDS),
                         new HeartBeatHandler(),
                         new RequestListener()
                 );
-                ChannelUtils.setInit(channel,true);
+                channel.pipeline().addFirst(
+                        new IdleStateHandler(Context.INTRANET_READER_IDLE_TIME, 0, 0, TimeUnit.SECONDS)
+                );
+                //管道初始化完成,既可以发送心跳包
+                ChannelUtils.setInit(channel, true);
             }
 
         }

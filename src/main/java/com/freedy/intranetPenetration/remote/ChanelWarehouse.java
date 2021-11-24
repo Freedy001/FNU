@@ -1,9 +1,9 @@
 package com.freedy.intranetPenetration.remote;
 
 import com.freedy.Context;
-import com.freedy.Protocol;
 import com.freedy.Struct;
 import com.freedy.intranetPenetration.OccupyState;
+import com.freedy.intranetPenetration.Protocol;
 import com.freedy.loadBalancing.LoadBalance;
 import com.freedy.loadBalancing.LoadBalanceFactory;
 import com.freedy.utils.ChannelUtils;
@@ -42,7 +42,8 @@ public class ChanelWarehouse extends SimpleChannelInboundHandler<Struct.ConfigGr
             }
         }
         loadBalance.addElement(channel);
-        ChannelUtils.setOccupy(channel, new OccupyState(channel,group));
+        ChannelUtils.setOccupy(channel, new OccupyState(channel, group.getRemoteServerPort()));
+        ChannelUtils.setGroup(channel, group);
 
         channel.writeAndFlush(Protocol.ACK);
         log.debug("[server]发送ACK");

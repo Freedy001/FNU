@@ -23,10 +23,11 @@ public class ResponseListener extends ChannelInboundHandlerAdapter {
         OccupyState state = ChannelUtils.getOccupy(intranetChannel);
         Channel receiverChannel = state.getReceiverChannel();
 
-        if (receiverChannel.isActive()){
+
+        if (receiverChannel != null && receiverChannel.isActive()) {
             receiverChannel.writeAndFlush(msg);
-        }else {
-            log.warn("A message will be discarded,because the receiverChannel is not active!");
+        } else {
+            log.warn("A message will be discarded,because the receiverChannel is already release!");
             ReleaseUtil.release(msg);
         }
     }

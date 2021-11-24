@@ -9,7 +9,6 @@ import com.freedy.loadBalancing.LoadBalance;
 import com.freedy.utils.ReleaseUtil;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
@@ -17,7 +16,6 @@ import io.netty.handler.codec.LengthFieldPrepender;
 import lombok.extern.slf4j.Slf4j;
 
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -55,15 +53,15 @@ public class MsgForward extends ChannelInboundHandlerAdapter {
                 .handler(new ChannelInitializer<>() {
                     @Override
                     protected void initChannel(Channel channel) {
-                        if (Context.AES_KEY == null) {
-                            channel.pipeline().addLast(new LocalMsgForward(localChannel,port));
+                        if (isProxy) {
+                            channel.pipeline().addLast(new LocalMsgForward(localChannel, port));
                         } else {
                             channel.pipeline().addLast(
                                     new LengthFieldBasedFrameDecoder(Integer.MAX_VALUE, 0, 4, 0, 4),
                                     new LengthFieldPrepender(4),
                                     new AuthenticAndEncrypt(),
-                                    new AuthenticAndDecrypt(),
-                                    new LocalMsgForward(localChannel,port)
+                                    new AuthenticAndDecrypt(null),
+                                    new LocalMsgForward(localChannel, port)
                             );
                         }
                     }

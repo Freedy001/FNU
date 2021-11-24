@@ -1,17 +1,16 @@
 package com.freedy.intranetPenetration.local;
 
-import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.util.ReferenceCountUtil;
-
-import java.nio.charset.Charset;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * @author Freedy
  * @date 2021/11/17 15:20
  */
+@Slf4j
 public class ResponseForward extends ChannelInboundHandlerAdapter {
 
     private final Channel remoteServerChannel;
@@ -28,5 +27,10 @@ public class ResponseForward extends ChannelInboundHandlerAdapter {
         } else {
             ReferenceCountUtil.release(msg);
         }
+    }
+
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+        log.error("[EXCEPTION]: {}", cause.getMessage());
     }
 }

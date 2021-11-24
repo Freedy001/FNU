@@ -1,8 +1,8 @@
 package com.freedy.intranetPenetration.remote;
 
 import com.freedy.Context;
-import com.freedy.Protocol;
 import com.freedy.Struct;
+import com.freedy.intranetPenetration.Protocol;
 import com.freedy.utils.ChannelUtils;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBufAllocator;
@@ -46,15 +46,17 @@ public class ServerHandshake extends SimpleChannelInboundHandler<String> {
                         channel.pipeline().remove(ChanelWarehouse.class);
                         channel.pipeline().remove(ServerHandshake.class);
                         channel.pipeline().addLast(
-                                new IdleStateHandler(Context.INTRANET_READER_IDLE_TIME, 0, 0, TimeUnit.SECONDS),
                                 new HeartBeatHandler(),
                                 new ResponseListener()
+                        );
+                        channel.pipeline().addFirst(
+                                new IdleStateHandler(Context.INTRANET_READER_IDLE_TIME, 0, 0, TimeUnit.SECONDS)
                         );
                     }
                 });
 
             }
-            Struct.ConfigGroup group = ChannelUtils.getOccupy(channel).getGroup();
+            Struct.ConfigGroup group = ChannelUtils.getGroup(channel);
             final int remoteServerPort = group.getRemoteServerPort();
             if (PORT_STARTED.put(remoteServerPort, fakeChannel)==null) {
                 //启动服务
@@ -81,6 +83,7 @@ public class ServerHandshake extends SimpleChannelInboundHandler<String> {
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+        cause.printStackTrace();
         log.info("[EXCEPTION]: " + cause.getMessage());
     }
 

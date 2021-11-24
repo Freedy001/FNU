@@ -13,6 +13,7 @@ public class ReleaseUtil {
 
 
     public static void release(Object msg) {
+        if (msg == null) return;
         if (msg instanceof ReferenceCounted m) {
             if (m.refCnt() > 0)
                 m.release();

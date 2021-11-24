@@ -28,23 +28,23 @@ public class Start {
             nameChannelMap.put("JUMP_LOCAL_SERVER",channel);
         }
         if (configuration.isStartRemoteJumpHttpProxy()&&JUMP_REMOTE_PORT != -1) {
-            Channel channel = RemoteServer.start(JUMP_REMOTE_PORT);
+            Channel channel = RemoteServer.start(JUMP_REMOTE_PORT, false);
             nameChannelMap.put("JUMP_REMOTE_SERVER",channel);
         }
         if (configuration.isStartReverseProxy()&&REVERSE_PROXY_PORT != -1) {
             Channel channel = LocalServer.start(REVERSE_PROXY_PORT, REVERSE_PROXY_LB, true);
             nameChannelMap.put("REVERSE_PROXY_SERVER",channel);
         }
-        if (configuration.isStartHttpProxy()&&HTTP_PROXY_PORT != -1) {
-            Channel channel = RemoteServer.start(HTTP_PROXY_PORT);
-            nameChannelMap.put("HTTP_PROXY_SERVER",channel);
+        if (configuration.isStartHttpProxy() && HTTP_PROXY_PORT != -1) {
+            Channel channel = RemoteServer.start(HTTP_PROXY_PORT, true);
+            nameChannelMap.put("HTTP_PROXY_SERVER", channel);
         }
-        if (configuration.isStartLocalIntranet()&&INTRANET_CHANNEL_CACHE_SIZE!=-1){
-            ClientConnector.start().addListener(channel -> nameChannelMap.put("INTRANET_LOCAL_SERVER",channel));
+        if (configuration.isStartLocalIntranet() && INTRANET_CHANNEL_CACHE_MIN_SIZE != -1) {
+            ClientConnector.start().addListener(channel -> nameChannelMap.put("INTRANET_LOCAL_SERVER", channel));
         }
-        if (configuration.isStartRemoteIntranet()&&INTRANET_REMOTE_PORT!=-1){
+        if (configuration.isStartRemoteIntranet() && INTRANET_REMOTE_PORT != -1) {
             Channel channel = IntranetServer.start();
-            nameChannelMap.put("INTRANET_REMOTE_SERVER",channel);
+            nameChannelMap.put("INTRANET_REMOTE_SERVER", channel);
         }
 
         LockSupport.park();

@@ -2,7 +2,6 @@ package com.freedy.jumpProxy.remote;
 
 import com.freedy.AuthenticAndDecrypt;
 import com.freedy.AuthenticAndEncrypt;
-import com.freedy.Context;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
@@ -22,10 +21,10 @@ import io.netty.handler.codec.http.HttpResponseEncoder;
 public class RemoteServer {
 
     public static void main(String[] args) throws Exception {
-        start(1);
+        start(1, false);
     }
 
-    public static Channel start(int port) throws Exception {
+    public static Channel start(int port, boolean isHttpProxy) throws Exception {
         ServerBootstrap bootstrap = new ServerBootstrap();
         bootstrap.option(ChannelOption.SO_BACKLOG, 10240)
                 .group(new NioEventLoopGroup(1), new NioEventLoopGroup(0))
@@ -33,7 +32,7 @@ public class RemoteServer {
                 .childHandler(new ChannelInitializer<>() {
                     @Override
                     protected void initChannel(Channel ch) throws Exception {
-                        if (Context.AES_KEY == null) {
+                        if (isHttpProxy) {
                             ch.pipeline().addLast(
                                     new HttpRequestDecoder(),
                                     new HttpResponseEncoder(),
@@ -45,7 +44,7 @@ public class RemoteServer {
                                     new LengthFieldBasedFrameDecoder(Integer.MAX_VALUE, 0, 4, 0, 4),
                                     new LengthFieldPrepender(4),
                                     new AuthenticAndEncrypt(),
-                                    new AuthenticAndDecrypt(),
+                                    new AuthenticAndDecrypt(null),
                                     new HttpRequestDecoder(),
                                     new HttpResponseEncoder(),
                                     new HttpObjectAggregator(Integer.MAX_VALUE),

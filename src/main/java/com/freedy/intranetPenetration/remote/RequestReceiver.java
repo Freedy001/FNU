@@ -11,11 +11,8 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import lombok.extern.slf4j.Slf4j;
 
-import java.lang.reflect.Field;
 import java.util.Map;
-import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * @author Freedy
@@ -61,7 +58,7 @@ public class RequestReceiver extends ChannelInboundHandlerAdapter {
             OccupyState state = ChannelUtils.getOccupy(intranetChannel);
 
             if (state.tryOccupy(receiverChannel)){
-                OccupyState.inspectChannelState();
+                state.inspectChannelState();
                 //转发信息
                 intranetChannel.writeAndFlush(msg);
                 intranetReceiverMap.put(intranetChannel, receiverChannel);
@@ -72,7 +69,7 @@ public class RequestReceiver extends ChannelInboundHandlerAdapter {
 
                     state.submitTask(new ForwardTask(receiverChannel, msg));
                     changeTimes = 0;
-                    OccupyState.inspectChannelState();
+                    state.inspectChannelState();
                     return;
                 }
 

@@ -50,12 +50,16 @@ public class RequestListener extends ChannelInboundHandlerAdapter {
                     ErrorHandler.LocalServerErr(ctx,msg);
                     return;
                 }
-                lastCircleTime=currentTimeMillis;
-                spin=0;
+                lastCircleTime = currentTimeMillis;
+                spin = 0;
             }
             localServerChannel = null;
             channelRead(ctx, msg);
         }
     }
 
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+        log.error("[EXCEPTION]: {}", cause.getMessage());
+    }
 }

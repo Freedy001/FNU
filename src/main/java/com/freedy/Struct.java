@@ -3,6 +3,7 @@ package com.freedy;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.ToString;
 
 import java.io.Serializable;
 
@@ -32,6 +33,25 @@ public class Struct {
         private int remoteServerPort;
     }
 
+    @ToString
+    public static class BoolWithStamp {
+        private boolean b = false;
+        private int stamp = 0;
+
+        public synchronized int set(boolean flag) {
+            b = flag;
+            return ++stamp;
+        }
+
+        public boolean get() {
+            return b;
+        }
+
+        public int getStamp() {
+            return stamp;
+        }
+    }
+
     /**
      * ip地址与端口号的结构体
      */
@@ -53,4 +73,9 @@ public class Struct {
             return false;
         }
     }
+
+    public record ProtocolInfo(String name, String parameter) {
+    }
+
+
 }
