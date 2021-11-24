@@ -10,7 +10,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.locks.LockSupport;
 
-import static com.freedy.Context.*;
+
 
 /**
  * @author Freedy
@@ -18,31 +18,28 @@ import static com.freedy.Context.*;
  */
 public class Start {
     public static void main(String[] args) throws Exception {
-        Configuration configuration = new CMDParamParser(args).parse();
-        propertiesPath = configuration.getPropertiesPath();
+        Map<String, Channel> nameChannelMap = new HashMap<>();
 
-        Map<String, Channel> nameChannelMap=new HashMap<>();
-
-        if (configuration.isStartLocalJumpHttpProxy()&&JUMP_LOCAL_PORT != -1) {
-            Channel channel = LocalServer.start(JUMP_LOCAL_PORT, JUMP_REMOTE_LB, false);
-            nameChannelMap.put("JUMP_LOCAL_SERVER",channel);
+        if (Context.JUMP_LOCAL_PORT != -1) {
+            Channel channel = LocalServer.start(Context.JUMP_LOCAL_PORT, Context.JUMP_REMOTE_LB, false);
+            nameChannelMap.put("JUMP_LOCAL_SERVER", channel);
         }
-        if (configuration.isStartRemoteJumpHttpProxy()&&JUMP_REMOTE_PORT != -1) {
-            Channel channel = RemoteServer.start(JUMP_REMOTE_PORT, false);
-            nameChannelMap.put("JUMP_REMOTE_SERVER",channel);
+        if (Context.JUMP_REMOTE_PORT != -1) {
+            Channel channel = RemoteServer.start(Context.JUMP_REMOTE_PORT, false);
+            nameChannelMap.put("JUMP_REMOTE_SERVER", channel);
         }
-        if (configuration.isStartReverseProxy()&&REVERSE_PROXY_PORT != -1) {
-            Channel channel = LocalServer.start(REVERSE_PROXY_PORT, REVERSE_PROXY_LB, true);
-            nameChannelMap.put("REVERSE_PROXY_SERVER",channel);
+        if (Context.REVERSE_PROXY_PORT != -1) {
+            Channel channel = LocalServer.start(Context.REVERSE_PROXY_PORT, Context.REVERSE_PROXY_LB, true);
+            nameChannelMap.put("REVERSE_PROXY_SERVER", channel);
         }
-        if (configuration.isStartHttpProxy() && HTTP_PROXY_PORT != -1) {
-            Channel channel = RemoteServer.start(HTTP_PROXY_PORT, true);
+        if (Context.HTTP_PROXY_PORT != -1) {
+            Channel channel = RemoteServer.start(Context.HTTP_PROXY_PORT, true);
             nameChannelMap.put("HTTP_PROXY_SERVER", channel);
         }
-        if (configuration.isStartLocalIntranet() && INTRANET_CHANNEL_CACHE_MIN_SIZE != -1) {
+        if (Context.INTRANET_CHANNEL_CACHE_MIN_SIZE != -1) {
             ClientConnector.start().addListener(channel -> nameChannelMap.put("INTRANET_LOCAL_SERVER", channel));
         }
-        if (configuration.isStartRemoteIntranet() && INTRANET_REMOTE_PORT != -1) {
+        if (Context.INTRANET_REMOTE_PORT != -1) {
             Channel channel = IntranetServer.start();
             nameChannelMap.put("INTRANET_REMOTE_SERVER", channel);
         }

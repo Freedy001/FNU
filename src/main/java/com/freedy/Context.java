@@ -5,6 +5,7 @@ import com.freedy.loadBalancing.LoadBalanceFactory;
 import com.freedy.utils.ChannelUtils;
 import com.freedy.utils.EncryptUtil;
 
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -60,12 +61,18 @@ public class Context {
     static String propertiesPath;
 
     static {
+
         Properties properties = new Properties();
 
 
         try {
-            properties.load(propertiesPath != null ? new FileInputStream(propertiesPath) :
-                    Context.class.getClassLoader().getResourceAsStream("conf.properties"));
+            File file = new File("./conf.properties");
+            if (file.exists()) {
+                System.out.println("配置文件路径:" + file.getAbsolutePath());
+                properties.load(new FileInputStream(file));
+            } else {
+                properties.load(Context.class.getClassLoader().getResourceAsStream("conf.properties"));
+            }
         } catch (IOException e) {
             e.printStackTrace();
         }
