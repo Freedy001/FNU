@@ -47,13 +47,18 @@ public class OccupyState {
     private static final Map<Integer, Boolean> checkShrink = new ConcurrentHashMap<>();
     private static final Map<Integer, Struct.BoolWithStamp> checkExpandMap = new ConcurrentHashMap<>();
 
-    static {
-        ChanelWarehouse.PORT_CHANNEL_CACHE.forEach((k, v) -> {
-            lastReleaseTimeMap.put(k, new long[]{System.currentTimeMillis()});
-            wakeupMap.put(k, new ConcurrentLinkedQueue<>());
-            shrinkCountMap.put(k, new AtomicInteger());
-            checkExpandMap.put(k, new Struct.BoolWithStamp());
-        });
+    public static void initTaskQueue(int serverPort) {
+        lastReleaseTimeMap.put(serverPort, new long[]{System.currentTimeMillis()});
+        wakeupMap.put(serverPort, new ConcurrentLinkedQueue<>());
+        shrinkCountMap.put(serverPort, new AtomicInteger());
+        checkExpandMap.put(serverPort, new Struct.BoolWithStamp());
+    }
+
+    public static void removeTaskQueue(int serverPort) {
+        lastReleaseTimeMap.remove(serverPort);
+        wakeupMap.remove(serverPort);
+        shrinkCountMap.remove(serverPort);
+        checkExpandMap.remove(serverPort);
     }
 
     //服务端口

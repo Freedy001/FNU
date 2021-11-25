@@ -38,7 +38,12 @@ public class ChanelWarehouse extends SimpleChannelInboundHandler<Struct.ConfigGr
                 if ((loadBalance = ChanelWarehouse.PORT_CHANNEL_CACHE.get(serverPort)) != null) break createLB;
                 assert Context.PORT_CHANNEL_CACHE_LB_NAME != null;
                 loadBalance = LoadBalanceFactory.produce(Context.PORT_CHANNEL_CACHE_LB_NAME);
+                loadBalance.registerShutdownHook(() -> {
+                    PORT_CHANNEL_CACHE.remove(serverPort);
+                    OccupyState.removeTaskQueue(serverPort);
+                });
                 ChanelWarehouse.PORT_CHANNEL_CACHE.put(serverPort, loadBalance);
+                OccupyState.initTaskQueue(serverPort);
             }
         }
         loadBalance.addElement(channel);

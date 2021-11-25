@@ -50,6 +50,8 @@ public class Context {
     public final static int INTRANET_READER_IDLE_TIME = 5;
     //连接失败次数
     public final static int INTRANET_MAX_BAD_CONNECT_TIMES = 90;
+    //当服务的管道为0时，需要空闲多久关闭该服务
+    public final static int INTRANET_SERVER_ZERO_CHANNEL_IDLE_TIME =/*1_000 * 60 * 60 * 30*/10_000;
 
     public final static int HTTP_PROXY_PORT;
 
@@ -57,8 +59,6 @@ public class Context {
 
     //换行符
     public final static String LF = System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("win") ? "\r\n" : "\n";
-    //properties
-    static String propertiesPath;
 
     static {
 
