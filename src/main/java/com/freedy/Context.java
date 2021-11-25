@@ -45,9 +45,9 @@ public class Context {
     //连接本地服务器失败次数
     public final static int INTRANET_CHANNEL_RETRY_TIMES = 3;
     //读空闲次数
-    public final static int INTRANET_READER_IDLE_TIMES = 5;
+    public final static int INTRANET_READER_IDLE_TIMES = 3;
     //读超时时间
-    public final static int INTRANET_READER_IDLE_TIME = 100000000;
+    public final static int INTRANET_READER_IDLE_TIME = 5;
     //连接失败次数
     public final static int INTRANET_MAX_BAD_CONNECT_TIMES = 90;
 

@@ -15,6 +15,7 @@ import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.LengthFieldPrepender;
 import lombok.extern.slf4j.Slf4j;
 
+import java.net.ConnectException;
 import java.nio.charset.Charset;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -121,7 +122,12 @@ public class MsgForward extends ChannelInboundHandlerAdapter {
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        log.error("[EXCEPTION]: {}", cause.getMessage());
+        if (cause instanceof ConnectException) {
+            ErrorHandler.handle(ctx, null);
+        } else {
+            cause.printStackTrace();
+            log.error("[EXCEPTION]: {}", cause.getMessage());
+        }
     }
 
 }

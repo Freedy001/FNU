@@ -5,6 +5,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ByteToMessageDecoder;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.Arrays;
 import java.util.List;
@@ -27,6 +28,7 @@ import java.util.function.BiFunction;
  * @author Freedy
  * @date 2021/11/10 16:26
  */
+@Slf4j
 public class AuthenticAndDecrypt extends ByteToMessageDecoder {
 
     private final BiFunction<ChannelHandlerContext, String, Boolean> cmdInterception;
@@ -49,6 +51,7 @@ public class AuthenticAndDecrypt extends ByteToMessageDecoder {
         //身份认证
         in.readBytes(authentication);
         if (!Arrays.equals(authentication, Context.AUTHENTICATION)) {
+            log.error("remote channel{} authentic fail!", ctx.channel().remoteAddress());
             ctx.channel().close();
             return;
         }

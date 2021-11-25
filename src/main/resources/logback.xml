@@ -9,7 +9,7 @@
 
     <logger name="io.netty" level="info"/>
     　　　
-    <root level="DEBUG">
+    <root level="debug">
         <appender-ref ref="STDOUT"/>
     </root>
 </configuration>

@@ -39,6 +39,7 @@ public class ErrorHandler {
     }
 
     public static void handle(Channel channel, Object msg) {
+        channel.pipeline().flush();
         channel.pipeline().addLast(new HttpResponseEncoder());
         DefaultFullHttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NOT_FOUND);
 
