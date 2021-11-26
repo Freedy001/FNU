@@ -105,6 +105,32 @@ proxy.start=false
 proxy.port=9090
 ```
 
+- 有跳板的http代理
+
+跳板节点配置
+
+```properties
+#是否启用
+jump.local.start=true
+#启动端口
+jump.local.server.port=8900
+#下一个跳板或者终点服务地址,多个用(,)分割
+jump.local.connect.address=127.0.0.1:8100
+# 负载均衡算法，默认轮询(Round Robin,Weighted Round Robin,Source IP Hash,Random)
+jump.local.loadBalancing.algorithm=Random
+# 加权轮询时每个地址的权重,其数量必须和reverse.proxy.server.address的数量一致
+jump.local.loadBalancing.algorithm.weight=1,1,1,1
+```
+
+终点节点配置
+
+```properties
+#是否启用
+jump.remote.start=true
+#启动端口
+jump.remote.server.port=8100
+```
+
 ### 内网穿透
 
 - 客户端配置
@@ -160,31 +186,6 @@ intranet.remote.channel.loadBalancing=Round Robin
 3. Source IP Hash (源ip的hash取模算法,保证同一ip每次都负载到相同的管道)   在这里不能使用此算法
 4. Weighted Round Robin (加权轮询) 暂未实现
 
-- 跳跃http代理
-
-跳板节点配置
-
-```properties
-#是否启用
-jump.local.start=true
-#启动端口
-jump.local.server.port=8900
-#下一个跳板或者终点服务地址,多个用(,)分割
-jump.local.connect.address=127.0.0.1:8100
-# 负载均衡算法，默认轮询(Round Robin,Weighted Round Robin,Source IP Hash,Random)
-jump.local.loadBalancing.algorithm=Random
-# 加权轮询时每个地址的权重,其数量必须和reverse.proxy.server.address的数量一致
-jump.local.loadBalancing.algorithm.weight=1,1,1,1
-```
-
-终点节点配置
-
-```properties
-#是否启用
-jump.remote.start=true
-#启动端口
-jump.remote.server.port=8100
-```
 
 ### 加密配置
 
