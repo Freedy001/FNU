@@ -47,7 +47,7 @@ public class ChanelWarehouse extends SimpleChannelInboundHandler<Struct.ConfigGr
             }
         }
         loadBalance.addElement(channel);
-        ChannelUtils.setOccupy(channel, new OccupyState(channel, group.getRemoteServerPort()));
+        ChannelUtils.setOccupy(channel, new OccupyState(channel, serverPort));
         ChannelUtils.setGroup(channel, group);
 
         channel.writeAndFlush(Protocol.ACK);

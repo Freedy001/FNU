@@ -29,13 +29,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Slf4j
 @ToString
 public class OccupyState {
-    //是否被占用
-    private final AtomicBoolean occupied = new AtomicBoolean(false);
-    //占用者的channel
-    @Getter
-    private Channel receiverChannel;
-    //该对象所属的管道
-    private final Channel intranetChannel;
     //公用变量
     //上次释放锁的时间
     private static final Map<Integer, long[]> lastReleaseTimeMap = new ConcurrentHashMap<>();
@@ -61,11 +54,18 @@ public class OccupyState {
         checkExpandMap.remove(serverPort);
     }
 
+    //是否被占用
+    private final AtomicBoolean occupied = new AtomicBoolean(false);
+    //占用者的channel
+    @Getter
+    private Channel receiverChannel;
+    //该对象所属的管道
+    private final Channel intranetChannel;
     //服务端口
     @Getter
     private final int serverPort;
     /*
-     * 以下三个对象 在相同的serverPort的channel中所引用的对象是相同的
+     * 以下四个对象 在相同的serverPort的channel中所引用的对象是相同的
      * 言外之意，同一个服务的所有管道公用以下三个对象
      */
     //任务队列
@@ -122,7 +122,7 @@ public class OccupyState {
         checkExpand.set(false);
     }
 
-    public void inspectChannelState() {
+    public static void inspectChannelState() {
         ChanelWarehouse.PORT_CHANNEL_CACHE.forEach((k, v) -> {
             int busy = getBusyChannelCount(v);
             try {
@@ -238,7 +238,7 @@ public class OccupyState {
     }
 
 
-    private int getBusyChannelCount(LoadBalance<Channel> loadBalance) {
+    private static int getBusyChannelCount(LoadBalance<Channel> loadBalance) {
         int count = 0;
         for (Channel channel : loadBalance.getAllSafely()) {
             if (ChannelUtils.getOccupy(channel).occupied.get())

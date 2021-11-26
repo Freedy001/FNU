@@ -42,26 +42,27 @@ public abstract class LoadBalance<T> {
         if (sentinelThread == null) {
             synchronized (shutdownTaskMap) {
                 if (sentinelThread != null) return;
+                //起一个线程专门用来回收所有LoadBalance实例
                 sentinelThread = new Thread(() -> {
                     long sleepTime = Context.INTRANET_SERVER_ZERO_CHANNEL_IDLE_TIME;
                     log.info("start load-balance-sentinel thread");
                     while (true) {
                         LockSupport.park();
                         try {
-                            System.out.println("睡眠时间：" + (sleepTime + 1000));
                             Thread.sleep(sleepTime + 1000);
                             sleepTime = Context.INTRANET_SERVER_ZERO_CHANNEL_IDLE_TIME;
                         } catch (InterruptedException ignored) {
-                            log.warn("Thread sleep is interrupted,that mean the dead load-balance is alive now.");
+                            log.info("Thread sleep is interrupted,that mean the dead load-balance is alive now.");
                         }
                         for (Map.Entry<LoadBalance<?>, Runnable> entry : shutdownTaskMap.entrySet()) {
                             LoadBalance<?> loadBalance = entry.getKey();
                             long lastZeroTime = loadBalance.lastZeroTime;
                             if (lastZeroTime == 0) continue;
                             long waitingTime = now() - lastZeroTime;
+                            //检测是否满足回收条件
                             if (waitingTime > Context.INTRANET_SERVER_ZERO_CHANNEL_IDLE_TIME) {
                                 //do hook
-                                log.info("ready to recycle load-balance{} and execute shutdown hook", loadBalance);
+                                log.warn("ready to recycle load-balance{} and execute shutdown hook", loadBalance);
                                 entry.getValue().run();
                                 loadBalance.lbElement = null;
                                 loadBalance.eventList = null;
@@ -90,9 +91,10 @@ public abstract class LoadBalance<T> {
     public void addElement(T element) {
         lbElement.add(element);
         eventList.forEach(loadBalanceConsumer -> loadBalanceConsumer.accept(this));
-        if (sentinelThread == null) return;
-        lastZeroTime = 0;
-        sentinelThread.interrupt();
+        if (sentinelThread != null && lastZeroTime != 0) {
+            lastZeroTime = 0;
+            sentinelThread.interrupt();
+        }
     }
 
     public void removeElement(T element) {

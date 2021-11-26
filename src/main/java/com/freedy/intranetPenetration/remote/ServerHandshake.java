@@ -75,7 +75,7 @@ public class ServerHandshake extends SimpleChannelInboundHandler<String> {
                         })
                         .bind(remoteServerPort).sync().channel();
                 PORT_STARTED.put(remoteServerPort, parentChannel);
-                System.out.println("Intranet-Slave-Server started success on port:" + remoteServerPort);
+                log.warn("Intranet-Slave-Server started success on port:{}", remoteServerPort);
             }
 
         }

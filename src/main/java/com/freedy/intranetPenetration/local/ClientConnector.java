@@ -46,7 +46,7 @@ public class ClientConnector {
 
     public static ParentChannelFuture start() {
         final ParentChannelFuture future = new ParentChannelFuture();
-        bootstrap.group(new NioEventLoopGroup(0, new DefaultThreadFactory("intranet-client-worker")))
+        bootstrap.group(new NioEventLoopGroup(0, new DefaultThreadFactory("intranetClient")))
                 .channel(NioSocketChannel.class)
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10000)
                 .option(ChannelOption.SO_KEEPALIVE, true)
@@ -69,7 +69,7 @@ public class ClientConnector {
         sentinelDaemonThread.start();
 
 
-        System.out.println("Intranet client started success!");
+        log.info("Intranet client started success!");
         return future;
     }
 

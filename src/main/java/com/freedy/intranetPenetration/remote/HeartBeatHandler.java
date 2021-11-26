@@ -35,6 +35,7 @@ public class HeartBeatHandler extends ChannelInboundHandlerAdapter {
         if (cause instanceof ConnectException) {
             requireNewChannelAndDeleteOld(ctx);
         }
+//        cause.printStackTrace();
         log.error("[EXCEPTION]: {}", cause.getMessage());
     }
 

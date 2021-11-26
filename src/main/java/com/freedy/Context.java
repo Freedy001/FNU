@@ -4,6 +4,7 @@ import com.freedy.loadBalancing.LoadBalance;
 import com.freedy.loadBalancing.LoadBalanceFactory;
 import com.freedy.utils.ChannelUtils;
 import com.freedy.utils.EncryptUtil;
+import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -12,10 +13,13 @@ import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Properties;
 
+import static ch.qos.logback.core.pattern.color.ANSIConstants.*;
+
 /**
  * @author Freedy
  * @date 2021/11/8 10:30
  */
+@Slf4j
 public class Context {
     //本地服务端口号
     public final static int JUMP_LOCAL_PORT;
@@ -51,7 +55,7 @@ public class Context {
     //连接失败次数
     public final static int INTRANET_MAX_BAD_CONNECT_TIMES = 90;
     //当服务的管道为0时，需要空闲多久关闭该服务
-    public final static int INTRANET_SERVER_ZERO_CHANNEL_IDLE_TIME =/*1_000 * 60 * 60 * 30*/10_000;
+    public final static int INTRANET_SERVER_ZERO_CHANNEL_IDLE_TIME = 1_000 * 60 * 60 * 30; //半小时
 
     public final static int HTTP_PROXY_PORT;
 
@@ -61,14 +65,24 @@ public class Context {
     public final static String LF = System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("win") ? "\r\n" : "\n";
 
     static {
+        System.out.println("""         
+                  ______  ____                          ____             _____ _   _ _   _\s
+                 / / / / |  _ \\ _____      _____ _ __  | __ ) _   _     |  ___| \\ | | | | |
+                / / / /  | |_) / _ \\ \\ /\\ / / _ \\ '__| |  _ \\| | | |    | |_  |  \\| | | | |
+                \\ \\ \\ \\  |  __/ (_) \\ V  V /  __/ |    | |_) | |_| |    |  _| | |\\  | |_| |
+                 \\_\\_\\_\\ |_|   \\___/ \\_/\\_/ \\___|_|    |____/ \\__, |    |_|   |_| \\_|\\___/\s
+                                                              |___/                       \s
+                """
+                + ESC_START + RED_FG + ESC_END +
+                "Author:Freedy Version:1.0.0           GigHub:https://github.com/Freedy001/FNU"
+                + ESC_START + "0;" + DEFAULT_FG + ESC_END
+        );
 
         Properties properties = new Properties();
-
-
         try {
             File file = new File("./conf.properties");
             if (file.exists()) {
-                System.out.println("配置文件路径:" + file.getAbsolutePath());
+                log.info("配置文件路径:" + file.getAbsolutePath());
                 properties.load(new FileInputStream(file));
             } else {
                 properties.load(Context.class.getClassLoader().getResourceAsStream("conf.properties"));
@@ -86,8 +100,8 @@ public class Context {
                 authStr = EncryptUtil.stringToMD5(authStr);
             }
             AUTHENTICATION = authStr.getBytes(StandardCharsets.UTF_8);
-            System.out.println("AES对称加密密钥:" + AES_KEY);
-            System.out.println("认证加密次数:" + times);
+            log.info("AES对称加密密钥:" + AES_KEY);
+            log.info("认证加密次数:" + times);
         } else {
             AES_KEY = null;
             AUTHENTICATION = EncryptUtil.stringToMD5("AUTHENTICATION").getBytes(StandardCharsets.UTF_8);
@@ -100,9 +114,9 @@ public class Context {
                     properties.getProperty("jump.local.connect.address").split(","),
                     properties.getProperty("jump.local.loadBalancing.algorithm")
             );
-            System.out.println("初始化跳跃Http(redirect server)代理");
-            System.out.println("远程服务地址:" + properties.getProperty("jump.local.connect.address"));
-            System.out.println("负载均衡算法:" + properties.getProperty("jump.local.loadBalancing.algorithm"));
+            log.info("初始化跳跃Http(redirect server)代理");
+            log.info("远程服务地址:" + properties.getProperty("jump.local.connect.address"));
+            log.info("负载均衡算法:" + properties.getProperty("jump.local.loadBalancing.algorithm"));
         } else {
             JUMP_LOCAL_PORT = -1;
             JUMP_REMOTE_LB = null;
@@ -111,7 +125,7 @@ public class Context {
         //启动远程代理服务
         if (properties.getProperty("jump.remote.start","null").equals("true")) {
             JUMP_REMOTE_PORT = Integer.parseInt(properties.getProperty("jump.remote.server.port"));
-            System.out.println("初始化跳跃Http(remote proxy server)代理");
+            log.info("初始化跳跃Http(remote proxy server)代理");
         } else {
             JUMP_REMOTE_PORT = -1;
         }
@@ -123,9 +137,9 @@ public class Context {
                     properties.getProperty("reverse.proxy.server.address").split(","),
                     properties.getProperty("reverse.proxy.loadBalancing.algorithm")
             );
-            System.out.println("初始化反向代理服务器配置");
-            System.out.println("反向负载地址:" + properties.getProperty("reverse.proxy.server.address"));
-            System.out.println("负载均衡算法:" + properties.getProperty("reverse.proxy.loadBalancing.algorithm"));
+            log.info("初始化反向代理服务器配置");
+            log.info("反向负载地址:" + properties.getProperty("reverse.proxy.server.address"));
+            log.info("负载均衡算法:" + properties.getProperty("reverse.proxy.loadBalancing.algorithm"));
         } else {
             REVERSE_PROXY_PORT = -1;
             REVERSE_PROXY_LB = null;
@@ -162,17 +176,16 @@ public class Context {
 
                 try {
                     group.setRemoteServerPort(Integer.parseInt(c[i]));
-                }catch (NumberFormatException e){
+                } catch (NumberFormatException e) {
                     throw new IllegalArgumentException("Illegal intranet.local.group.remoteServerPort:" + c[i]);
                 }
-                groups[i]=group;
+                groups[i] = group;
             }
-            INTRANET_GROUPS=groups;
-            System.out.println("初始化内网穿透(client)配置");
-            System.out.println("管道池中管道的数量:" + INTRANET_CHANNEL_CACHE_MIN_SIZE);
-            System.out.println("分组配置");
+            INTRANET_GROUPS = groups;
+            log.info("初始化内网穿透(client)配置");
+            log.info("管道池中管道的数量:" + INTRANET_CHANNEL_CACHE_MIN_SIZE);
             for (Struct.ConfigGroup group : groups) {
-                System.out.println(group);
+                log.info("分组配置:{}", group);
             }
         }else {
             INTRANET_GROUPS = null;
@@ -182,10 +195,10 @@ public class Context {
 
         //内网穿透服务端
         if (properties.getProperty("intranet.remote.start", "null").equals("true")) {
-            INTRANET_REMOTE_PORT=Integer.parseInt(properties.getProperty("intranet.remote.port","null"));
-            PORT_CHANNEL_CACHE_LB_NAME=properties.getProperty("intranet.remote.channel.loadBalancing","Round Robin");
-            System.out.println("初始化内网穿透(server)配置");
-            System.out.println("管道负载均衡算法:"+PORT_CHANNEL_CACHE_LB_NAME);
+            INTRANET_REMOTE_PORT = Integer.parseInt(properties.getProperty("intranet.remote.port", "null"));
+            PORT_CHANNEL_CACHE_LB_NAME = properties.getProperty("intranet.remote.channel.loadBalancing", "Round Robin");
+            log.info("初始化内网穿透(server)配置");
+            log.info("管道负载均衡算法:" + PORT_CHANNEL_CACHE_LB_NAME);
         }else {
             INTRANET_REMOTE_PORT=-1;
             PORT_CHANNEL_CACHE_LB_NAME=null;
@@ -193,7 +206,7 @@ public class Context {
 
         if (properties.getProperty("proxy.start","null").equals("true")) {
             HTTP_PROXY_PORT = Integer.parseInt(properties.getProperty("proxy.port"));
-            System.out.println("初始化内HTTP代理服务器配置");
+            log.info("初始化内HTTP代理服务器配置");
         } else {
             HTTP_PROXY_PORT = -1;
         }

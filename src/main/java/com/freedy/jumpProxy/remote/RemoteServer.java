@@ -2,6 +2,7 @@ package com.freedy.jumpProxy.remote;
 
 import com.freedy.AuthenticAndDecrypt;
 import com.freedy.AuthenticAndEncrypt;
+import com.freedy.Context;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
@@ -13,15 +14,17 @@ import io.netty.handler.codec.LengthFieldPrepender;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpRequestDecoder;
 import io.netty.handler.codec.http.HttpResponseEncoder;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * @author Freedy
  * @date 2021/11/6 17:05
  */
+@Slf4j
 public class RemoteServer {
 
     public static void main(String[] args) throws Exception {
-        start(1, false);
+        start(Context.JUMP_REMOTE_PORT, false);
     }
 
     public static Channel start(int port, boolean isHttpProxy) throws Exception {
@@ -54,7 +57,7 @@ public class RemoteServer {
                     }
                 });
         Channel channel = bootstrap.bind(port).sync().channel();
-        System.out.println("remote server start on port:" + port);
+        log.info("remote server start on port:{}", port);
         return channel;
     }
 

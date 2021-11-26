@@ -125,7 +125,7 @@ public class MsgForward extends ChannelInboundHandlerAdapter {
         if (cause instanceof ConnectException) {
             ErrorHandler.handle(ctx, null);
         } else {
-            cause.printStackTrace();
+//            cause.printStackTrace();
             log.error("[EXCEPTION]: {}", cause.getMessage());
         }
     }

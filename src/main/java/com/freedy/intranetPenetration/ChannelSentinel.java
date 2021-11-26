@@ -26,6 +26,7 @@ public class ChannelSentinel extends TimerTask {
     @Override
     @SuppressWarnings({"InfiniteLoopStatement", "BusyWait"})
     public void run() {
+        log.info("start channel heartbeat and size check sentinel thread");
         do {
             try {
                 ClientConnector.remoteChannelMap.forEach((group, channelList) -> {

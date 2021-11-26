@@ -9,15 +9,18 @@ import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * @author Freedy
  * @date 2021/11/6 16:19
  */
+@Slf4j
 public class LocalServer {
 
+
     public static void main(String[] args) throws InterruptedException {
-        start(Context.REVERSE_PROXY_PORT, Context.REVERSE_PROXY_LB, true);
+        start(Context.JUMP_LOCAL_PORT, Context.JUMP_REMOTE_LB, false);
     }
 
     public static Channel start(int port, LoadBalance<Struct.IpAddress> lb, boolean isReverseProxy) throws InterruptedException {
@@ -36,7 +39,7 @@ public class LocalServer {
                 });
 
         Channel channel = bootstrap.bind(port).sync().channel();
-        System.out.println((isReverseProxy ? "ReverseProxy" : "local") + " service started success on port:" + port);
+        log.info((isReverseProxy ? "ReverseProxy" : "local") + " service started success on port: {}", port);
         return channel;
     }
 }

@@ -16,13 +16,15 @@ import io.netty.handler.codec.serialization.ClassResolvers;
 import io.netty.handler.codec.serialization.ObjectDecoder;
 import io.netty.handler.codec.serialization.ObjectEncoder;
 import io.netty.util.concurrent.DefaultThreadFactory;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * @author Freedy
  * @date 2021/11/17 15:23
  */
+@Slf4j
 public class IntranetServer {
-    public static final NioEventLoopGroup workGroup = new NioEventLoopGroup(0,new DefaultThreadFactory("intranet-server-worker"));
+    public static final NioEventLoopGroup workGroup = new NioEventLoopGroup(0, new DefaultThreadFactory("intranetServer"));
 
 
     public static void main(String[] args) throws Exception{
@@ -54,7 +56,7 @@ public class IntranetServer {
                 })
                 .bind(Context.INTRANET_REMOTE_PORT).sync().channel();
 
-        System.out.println("Intranet-Master-Server started success on port:" + Context.INTRANET_REMOTE_PORT);
+        log.info("Intranet-Master-Server started success on port:{}", Context.INTRANET_REMOTE_PORT);
         return channel;
 
     }
