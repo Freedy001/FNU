@@ -33,7 +33,7 @@ jobs:
         username: ${{ secrets.SSHUSSER }}
         password: ${{ secrets.SSHPASSWORD }}
         local-dir: "./target/"
-        server-dir: "/root"
+        server-dir: "/root/"
 
 
 
