@@ -75,7 +75,7 @@ Author:Freedy Version:1.0.0           GigHub:https://github.com/Freedy001/FNU
     </pre>
 
 
-3. 点击在start类点击运行
+3. 在Start类点击运行
 
 ## 配置
 
