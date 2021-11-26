@@ -27,13 +27,13 @@ jobs:
       run: mvn package
 
     - name: push server
-      uses: sebastianpopp/ftp-action@releases/v2
+      uses: SamKirkland/FTP-Deploy-Action@4.2.0
       with:
-        host: ${{ secrets.SSHHOST }}
-        user: ${{ secrets.SSHUSSER }}
+        server: ${{ secrets.SSHHOST }}
+        username: ${{ secrets.SSHUSSER }}
         password: ${{ secrets.SSHPASSWORD }}
-        localDir: "./target/netUtils-1.0.0.jar"
-        remoteDir: "/root"
+        local-dir: "./target"
+        server-dir: "/root"
 
 
 
