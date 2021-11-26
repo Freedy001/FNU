@@ -83,8 +83,8 @@ public class ServerHandshake extends SimpleChannelInboundHandler<String> {
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        cause.printStackTrace();
-        log.info("[EXCEPTION]: " + cause.getMessage());
+//        cause.printStackTrace();
+        log.error("[EXCEPTION]: " + cause.getMessage());
     }
 
     //ConcurrentHashMap 的value不能为空,所以用这个Channel来代替空值

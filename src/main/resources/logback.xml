@@ -7,8 +7,7 @@
         <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
             <layout class="com.freedy.log.EasyPatternLayout">
                 <pattern>
-                    %d{yyyy-MM-dd HH:mm:ss.SSS} %easyHighlight(%5.5level) %magenta(%pid) --- [%15.15thread]
-                    %cyan(%-30.30logger{39}) : %msg%n
+                    %d{yyyy-MM-dd HH:mm:ss.SSS} %easyHighlight(%5.5level) %magenta(%pid) --- [%15.15thread] %cyan(%-30.30logger{39}) : %msg%n
                 </pattern>
             </layout>
         </encoder>
