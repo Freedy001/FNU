@@ -3,7 +3,6 @@
 <configuration scan="false" debug="false">
     　　  <!--其他配置省略-->
 
-
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
             <layout class="com.freedy.log.EasyPatternLayout">
