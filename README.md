@@ -1,4 +1,4 @@
-# FNU
+# FNU(Freedy's net utils)
 
 ## 介绍
 
