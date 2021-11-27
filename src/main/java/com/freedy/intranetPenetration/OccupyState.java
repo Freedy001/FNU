@@ -109,7 +109,7 @@ public class OccupyState {
             if (checkExpand.getStamp() == lastStamp) {
                 //解锁
                 checkExpand.set(false);
-                log.warn("expand-check-lock timed out,unlock unlock succeeded!");
+                log.warn("expand-check-lock timed out.log,unlock unlock succeeded!");
             }
         }, timeout, unit);
     }

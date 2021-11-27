@@ -37,7 +37,7 @@ public class AuthenticAndEncrypt extends MessageToByteEncoder<ByteBuf> {
         // cmd
         Channel channel = ctx.channel();
         byte[] cmd = ChannelUtils.getCmd(channel);
-//        System.out.println(new String(Objects.requireNonNullElse(cmd, emptyCmd)));
+//        System.out.log.println(new String(Objects.requireNonNullElse(cmd, emptyCmd)));
         out.writeBytes(Objects.requireNonNullElse(cmd, emptyCmd));
         ChannelUtils.clearCmd(channel);
 

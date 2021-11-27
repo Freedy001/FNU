@@ -42,7 +42,7 @@ public class HttpProxyHandler extends SimpleChannelInboundHandler<HttpRequest> {
         initHostAndPort();
 
         SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss");
-//        System.out.println("[PROXY@"+request.method()+"] "+df.format(new Date())+" "+remoteChannel.remoteAddress()+" try to connect "+host + ":" + port);
+//        System.out.log.println("[PROXY@"+request.method()+"] "+df.format(new Date())+" "+remoteChannel.remoteAddress()+" try to connect "+host + ":" + port);
         log.info("[PROXY-{}]{} try connect to {}", request.method(), remoteChannel.remoteAddress(), host + ":" + port);
         Promise<Channel> promise = ctx.executor().newPromise();
         if (request.method().equals(HttpMethod.CONNECT)) {

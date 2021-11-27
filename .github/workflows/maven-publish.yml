@@ -23,7 +23,7 @@ jobs:
         server-id: github # Value of the distributionManagement/repository/id field of the pom.xml
         settings-path: ${{ github.workspace }} # location for the settings.xml file
 
-    - name: Build with Maven
+    - name: 🔨 Build with Maven
       run: mvn package
 
     - name: 🚀 SCP to remote server
@@ -34,7 +34,8 @@ jobs:
         password: ${{ secrets.SSHPASSWORD }}
         port: 22
         source: "./target/netUtils-1.0.0.jar"
-        target: "/root/netUtils-1.0.0.jar"
+        target: "/root"
+        strip_components: 1
 
     - name: 🌈 run server
       uses: appleboy/ssh-action@master
