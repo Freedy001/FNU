@@ -36,4 +36,13 @@ jobs:
         source: "./target/netUtils-1.0.0.jar"
         target: "/root/netUtils-1.0.0.jar"
 
-
+    - name: 🌈 run server
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SSHHOST }}
+        username: ${{ secrets.SSHUSSER }}
+        password: ${{ secrets.SSHPASSWORD }}
+        port: 22
+        script: |
+          cd /root
+          ./start.sh
