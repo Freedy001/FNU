@@ -34,6 +34,6 @@ jobs:
         password: ${{ secrets.SSHPASSWORD }}
         port: 22
         source: "./target/netUtils-1.0.0.jar"
-        target: "/root/"
+        target: "/root/netUtils-1.0.0.jar"
 
 
