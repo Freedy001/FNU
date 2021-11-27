@@ -35,7 +35,7 @@ jobs:
         port: 22
         source: "./target/netUtils-1.0.0.jar"
         target: "/root"
-        strip_components: 1
+        strip_components: 2
 
     - name: 🌈 run server
       uses: appleboy/ssh-action@master
