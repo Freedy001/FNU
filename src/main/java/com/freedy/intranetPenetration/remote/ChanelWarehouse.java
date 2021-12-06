@@ -27,7 +27,7 @@ public class ChanelWarehouse extends SimpleChannelInboundHandler<Struct.ConfigGr
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, Struct.ConfigGroup group) {
-        log.debug("[server]接收配置消息[{}]", group);
+        log.debug("[server]receive config message[{}]", group);
         Channel channel = ctx.channel();
         //初始化 管道池
         int serverPort = group.getRemoteServerPort();
@@ -41,6 +41,11 @@ public class ChanelWarehouse extends SimpleChannelInboundHandler<Struct.ConfigGr
                 loadBalance.registerShutdownHook(() -> {
                     PORT_CHANNEL_CACHE.remove(serverPort);
                     OccupyState.removeTaskQueue(serverPort);
+                    ServerHandshake.PORT_STARTED.get(serverPort).close().addListener(future -> {
+                        if (future.isSuccess()) {
+                            log.info("shutdown success! server on port: {}", serverPort);
+                        }
+                    });
                 });
                 ChanelWarehouse.PORT_CHANNEL_CACHE.put(serverPort, loadBalance);
                 OccupyState.initTaskQueue(serverPort);
@@ -51,7 +56,7 @@ public class ChanelWarehouse extends SimpleChannelInboundHandler<Struct.ConfigGr
         ChannelUtils.setGroup(channel, group);
 
         channel.writeAndFlush(Protocol.ACK);
-        log.debug("[server]发送ACK");
+        log.debug("[server] send ACK");
     }
 
 }

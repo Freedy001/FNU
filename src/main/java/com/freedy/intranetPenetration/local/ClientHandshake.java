@@ -18,7 +18,7 @@ import java.util.concurrent.TimeUnit;
  * <h2>四次握手流程</h1>
  * <pre>
  *  第一次: 客户端像服务端发送配置组信息
- *         服务端更具分组信息将管道缓存起来
+ *         服务端根据分组信息将管道缓存起来
  *  第二次: 服务端返回ACK确认消息
  *         客户端对管道进行属性赋值
  *  第三次: 客户端发送CONNECT ESTABLISH SUCCEED!标识连接建立成功

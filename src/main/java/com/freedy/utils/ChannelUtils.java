@@ -115,7 +115,7 @@ public class ChannelUtils {
         channel.attr(cmd).set(null);
     }
 
-    private final static Pattern pattern = Pattern.compile("((\\d{1,3}\\.){3}(\\d{1,3})):(.*?)[^\\d]");
+    private final static Pattern pattern = Pattern.compile("(.*?):(.*?)[^\\d]");
 
     public static Struct.IpAddress parseAddress(SocketAddress address) {
         return parseAddress(address.toString());
@@ -125,11 +125,10 @@ public class ChannelUtils {
         try {
             Matcher matcher = pattern.matcher(address + " ");
             if (!matcher.find()) return null;
-            return new Struct.IpAddress(matcher.group(1), Integer.parseInt(matcher.group(4)));
+            return new Struct.IpAddress(matcher.group(1), Integer.parseInt(matcher.group(2)));
         } catch (Exception e) {
             return null;
         }
     }
-
 
 }

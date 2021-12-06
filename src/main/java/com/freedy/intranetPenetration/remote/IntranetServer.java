@@ -16,6 +16,7 @@ import io.netty.handler.codec.serialization.ClassResolvers;
 import io.netty.handler.codec.serialization.ObjectDecoder;
 import io.netty.handler.codec.serialization.ObjectEncoder;
 import io.netty.util.concurrent.DefaultThreadFactory;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -31,7 +32,8 @@ public class IntranetServer {
         start();
     }
 
-    public static Channel start() throws InterruptedException {
+    @SneakyThrows
+    public static Channel start()   {
         ServerBootstrap bootstrap = new ServerBootstrap();
         Channel channel = bootstrap.group(
                         new NioEventLoopGroup(1),

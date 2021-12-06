@@ -14,6 +14,7 @@ import io.netty.handler.codec.LengthFieldPrepender;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpRequestDecoder;
 import io.netty.handler.codec.http.HttpResponseEncoder;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -27,7 +28,8 @@ public class RemoteServer {
         start(Context.JUMP_REMOTE_PORT, false);
     }
 
-    public static Channel start(int port, boolean isHttpProxy) throws Exception {
+    @SneakyThrows
+    public static Channel start(int port, boolean isHttpProxy){
         ServerBootstrap bootstrap = new ServerBootstrap();
         bootstrap.option(ChannelOption.SO_BACKLOG, 10240)
                 .group(new NioEventLoopGroup(1), new NioEventLoopGroup(0))

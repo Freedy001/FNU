@@ -1,5 +1,6 @@
 package com.freedy.intranetPenetration;
 
+import com.freedy.Context;
 import com.freedy.Struct;
 import com.freedy.intranetPenetration.instruction.*;
 import io.netty.channel.ChannelHandlerContext;
@@ -86,7 +87,7 @@ public class Protocol {
     }
 
     public static void main(String[] args) throws IllegalAccessException {
-        for (Field field : Protocol.class.getDeclaredFields()) {
+        for (Field field : Context.class.getDeclaredFields()) {
             if (field.getType() == Instruction.class) {
                 String s = "_" + field.getName().toLowerCase(Locale.ROOT);
                 int lastIndex = 0;

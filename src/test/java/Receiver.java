@@ -10,11 +10,11 @@ import java.net.Socket;
 public class Receiver {
 
     public static void main(String[] args) throws IOException {
-        Socket socket = new Socket("106.14.177.142", 9090);
+        Socket socket = new Socket("106.14.177.142", 2323);
 
         InputStream inputStream = socket.getInputStream();
 
-        FileOutputStream outputStream = new FileOutputStream("C:\\Users\\Freedy\\Desktop\\code\\netUtils\\src\\test\\out.log");
+        FileOutputStream outputStream = new FileOutputStream("C:\\Users\\Freedy\\Desktop\\code\\netUtils\\src\\test\\test.log");
 
         inputStream.transferTo(outputStream);
 

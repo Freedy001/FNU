@@ -1,6 +1,7 @@
 package com.freedy.errorProcessor;
 
 import com.freedy.intranetPenetration.Protocol;
+import com.freedy.tinyFramework.annotation.beanContainer.Part;
 import com.freedy.utils.ChannelUtils;
 import com.freedy.utils.ReleaseUtil;
 import io.netty.channel.Channel;
@@ -20,6 +21,7 @@ import static io.netty.handler.codec.http.HttpHeaderNames.CONTENT_TYPE;
  * @author Freedy
  * @date 2021/11/18 11:25
  */
+@Part
 public class ErrorHandler {
 
     private final static byte[] errPage;

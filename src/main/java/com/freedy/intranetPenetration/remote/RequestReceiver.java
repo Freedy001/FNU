@@ -58,7 +58,7 @@ public class RequestReceiver extends ChannelInboundHandlerAdapter {
             OccupyState state = ChannelUtils.getOccupy(intranetChannel);
 
             if (state.tryOccupy(receiverChannel)){
-                state.inspectChannelState();
+                OccupyState.inspectChannelState();
                 //转发信息
                 intranetChannel.writeAndFlush(msg);
                 intranetReceiverMap.put(intranetChannel, receiverChannel);
@@ -69,7 +69,7 @@ public class RequestReceiver extends ChannelInboundHandlerAdapter {
 
                     state.submitTask(new ForwardTask(receiverChannel, msg));
                     changeTimes = 0;
-                    state.inspectChannelState();
+                    OccupyState.inspectChannelState();
                     return;
                 }
 

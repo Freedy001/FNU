@@ -28,7 +28,7 @@ public class HeartBeatHandler extends ChannelInboundHandlerAdapter {
 
             if (event.state() == IdleState.READER_IDLE) {
                 readIdleTimes++; // 读空闲的计数加1
-                log.debug("读空闲[{}]", readIdleTimes);
+                log.debug("管道{}读空闲[{}]", ctx.channel(), readIdleTimes);
             }else {
                 readIdleTimes=0;
             }

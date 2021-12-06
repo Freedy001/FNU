@@ -54,6 +54,29 @@ public class OccupyState {
         checkExpandMap.remove(serverPort);
     }
 
+    public static void inspectChannelState() {
+        ChanelWarehouse.PORT_CHANNEL_CACHE.forEach((k, v) -> {
+            int busy = getBusyChannelCount(v);
+            try {
+                int channelSize = v.size();
+                int taskQueueSize = wakeupMap.get(k).size();
+                log.debug("[REMOTE-HEART-RECEIVE]: service channel status port:{} total channel size: {} busy channel size:{}  taskQueue size: {}", k, channelSize, busy, taskQueueSize);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        });
+    }
+
+    private static int getBusyChannelCount(LoadBalance<Channel> loadBalance) {
+        int count = 0;
+        for (Channel channel : loadBalance.getAllSafely()) {
+            if (ChannelUtils.getOccupy(channel).occupied.get())
+                count++;
+        }
+        return count;
+    }
+
+
     //是否被占用
     private final AtomicBoolean occupied = new AtomicBoolean(false);
     //占用者的channel
@@ -122,19 +145,6 @@ public class OccupyState {
         checkExpand.set(false);
     }
 
-    public static void inspectChannelState() {
-        ChanelWarehouse.PORT_CHANNEL_CACHE.forEach((k, v) -> {
-            int busy = getBusyChannelCount(v);
-            try {
-                int channelSize = v.size();
-                int taskQueueSize = wakeupMap.get(k).size();
-                log.debug("[REMOTE-HEART-RECEIVE]: service channel status port:{} total channel size: {} busy channel size:{}  taskQueue size: {}", k, channelSize, busy, taskQueueSize);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        });
-    }
-
     public boolean isOccupy() {
         return occupied.get();
     }
@@ -160,7 +170,7 @@ public class OccupyState {
              */
             lockExpandCheck(5, TimeUnit.SECONDS);
             //need to expand
-            ChannelUtils.setCmd(intranetChannel, Protocol.EXPEND.param(taskQueueSize << 1 + taskQueueSize));
+            ChannelUtils.setCmd(intranetChannel, Protocol.EXPEND.param(taskQueueSize >> 1 + taskQueueSize));
         }
     }
 
@@ -235,15 +245,5 @@ public class OccupyState {
             }
         }
         return counter;
-    }
-
-
-    private static int getBusyChannelCount(LoadBalance<Channel> loadBalance) {
-        int count = 0;
-        for (Channel channel : loadBalance.getAllSafely()) {
-            if (ChannelUtils.getOccupy(channel).occupied.get())
-                count++;
-        }
-        return count;
     }
 }

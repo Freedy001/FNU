@@ -13,6 +13,7 @@ import io.netty.channel.*;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.LengthFieldPrepender;
+import io.netty.handler.codec.http.*;
 import lombok.extern.slf4j.Slf4j;
 
 import java.net.ConnectException;
@@ -38,12 +39,13 @@ public class MsgForward extends ChannelInboundHandlerAdapter {
     private final int port;
     private String remoteAddress;
     private int remotePort;
+    private final byte[] pacData;
 
-
-    public MsgForward(LoadBalance<Struct.IpAddress> lb, boolean isProxy, int port) {
+    public MsgForward(LoadBalance<Struct.IpAddress> lb, boolean isProxy, int port, byte[] pacData) {
         this.lb = lb;
         this.isProxy = isProxy;
         this.port = port;
+        this.pacData = pacData;
     }
 
     @Override
@@ -78,6 +80,48 @@ public class MsgForward extends ChannelInboundHandlerAdapter {
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws InterruptedException {
         Channel localChannel = ctx.channel();
+
+        //获取包信息
+        String packInfo = null;
+        if (msg instanceof ByteBuf byteBuf) {
+            packInfo = byteBuf.toString(Charset.defaultCharset());
+        }
+        //日志输出
+        if (isProxy) {
+            log.info("[REVERSE-PROXY]: redirect {} to {}", localChannel.remoteAddress().toString().substring(1), remoteAddress + ":" + remotePort);
+        } else {
+            if (packInfo != null) {
+                Matcher matcher = Pattern.compile("(.*?) (.*?)HTTP/(.|" + Context.LF + ")*?(Host|host): (.*?)" + Context.LF + ".*").matcher(packInfo);
+                if (matcher.find()) {
+                    //如果是http请求
+                    if (matcher.group(5).equals("127.0.0.1:8900")) {
+                        ctx.channel().pipeline().addLast(new HttpResponseEncoder());
+                        String url = matcher.group(2).trim();
+                        if (!url.equals("/pac")) {
+                            log.error("illegal url: {}", url);
+                            DefaultFullHttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR);
+                            ctx.channel().writeAndFlush(response).addListener(ChannelFutureListener.CLOSE);
+                            return;
+                        }
+                        if (pacData == null) {
+                            log.error("pac start failed,please check config!");
+                            DefaultFullHttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR);
+                            ctx.channel().writeAndFlush(response).addListener(ChannelFutureListener.CLOSE);
+                            return;
+                        }
+                        log.info("{} request pac",localChannel.remoteAddress().toString().substring(1));
+                        DefaultFullHttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
+                        response.headers().set(HttpHeaderNames.CONTENT_TYPE, "application/x-ns-proxy-autoconfig");
+                        response.headers().set(HttpHeaderNames.CONTENT_LENGTH, pacData.length);
+                        response.content().writeBytes(pacData);
+                        ctx.channel().writeAndFlush(response).addListener(ChannelFutureListener.CLOSE);
+                        return;
+                    }
+                    log.info("[PROXY-HTTP-{}]: {} send msg to {}", matcher.group(1), localChannel.remoteAddress().toString().substring(1), matcher.group(5));
+                }
+            }
+        }
+
         connectFuture.addListener(future -> {
             if (!future.isSuccess()) {
                 ErrorHandler.handle(ctx,msg);
@@ -86,27 +130,8 @@ public class MsgForward extends ChannelInboundHandlerAdapter {
             Channel remoteChannel = connectFuture.channel();
 
             if (remoteChannel.isActive()) {
-                //获取包信息
-                String packInfo = null;
-                if (msg instanceof ByteBuf byteBuf) {
-                    packInfo = byteBuf.toString(Charset.defaultCharset());
-                }
-
                 //转发数据
                 remoteChannel.writeAndFlush(msg);
-
-                //日志输出
-                if (isProxy) {
-                    log.info("[REVERSE-PROXY]: redirect {} to {}", localChannel.remoteAddress().toString().substring(1), remoteAddress + ":" + remotePort);
-                } else {
-                    if (packInfo != null) {
-                        Matcher matcher = Pattern.compile("(.*?) .*?HTTP/(.|" + Context.LF + ")*?(Host|host): (.*?)" + Context.LF + ".*").matcher(packInfo);
-                        if (matcher.find()) {
-                            //如果是http请求
-                            log.info("[PROXY-HTTP-{}]: {} send msg to {}", matcher.group(1), localChannel.remoteAddress().toString().substring(1), matcher.group(4));
-                        }
-                    }
-                }
             } else {
                 ReleaseUtil.release(msg);
             }
