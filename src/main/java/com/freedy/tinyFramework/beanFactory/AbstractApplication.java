@@ -32,7 +32,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public abstract class AbstractApplication extends DefaultBeanFactory {
 
 
-    private static final Map<String, Object> earlySingletonObject = new ConcurrentHashMap<>();
+    private final Map<String, Object> earlySingletonObject = new ConcurrentHashMap<>();
 
     protected final Map<String, BeanDefinition> beanDefinition = new ConcurrentHashMap<>();
     protected final Map<Class<?>, List<BeanDefinition>> beanTypeDefinition = new ConcurrentHashMap<>();
@@ -275,7 +275,8 @@ public abstract class AbstractApplication extends DefaultBeanFactory {
                     throw new NoSuchBeanException("can't acquire config bean ?,because the factory method's return value is null!", definition.getBeanName());
                 }
             }
-            if (beanDefinition instanceof PropertiesBeanDefinition propDefinition) {
+            //处理PropertiesBeanDefinition
+            if (definition instanceof PropertiesBeanDefinition propDefinition) {
                 //普通注入
                 bean = injectByConstruct(definition.getBeanClass());
                 //属性注入
@@ -284,28 +285,6 @@ public abstract class AbstractApplication extends DefaultBeanFactory {
             return bean;
         } catch (Exception e) {
             throw new BeanException("create instance failed,because ?", e);
-        }
-    }
-
-    private void invokePostConstruct(Object bean, BeanDefinition definition) {
-        Method postConstruct = definition.getPostConstruct();
-        if (postConstruct != null) {
-            try {
-                postConstruct.invoke(bean);
-            } catch (Exception e) {
-                throw new BeanException("invoke post-construct method failed,because ?", e.getCause() == null ? e.getMessage() : e.getCause());
-            }
-        }
-        List<Method> injectMethods = definition.getInjectMethods();
-        if (injectMethods != null) {
-            for (Method method : injectMethods) {
-                List<Object> args = getArgumentsFromBeanContainer(method);
-                try {
-                    method.invoke(bean, args.toArray());
-                } catch (Exception e) {
-                    throw new BeanException("invoke inject-methods method failed,because ?", e.getMessage());
-                }
-            }
         }
     }
 
@@ -351,12 +330,34 @@ public abstract class AbstractApplication extends DefaultBeanFactory {
                 try {
                     configBean = beanType.getConstructor().newInstance();
                 } catch (Exception e) {
-                    throw new BeanInitException("can't init bean[type:?] because ?", beanType.getName(), e.getMessage());
+                    throw new BeanInitException("can't init bean[type:?] because ?", beanType.getName(), e);
                 }
             }
         }
 
         return configBean;
+    }
+
+    private void invokePostConstruct(Object bean, BeanDefinition definition) {
+        Method postConstruct = definition.getPostConstruct();
+        if (postConstruct != null) {
+            try {
+                postConstruct.invoke(bean);
+            } catch (Exception e) {
+                throw new BeanException("invoke post-construct method failed,because ?", e.getCause() == null ? e.getMessage() : e.getCause());
+            }
+        }
+        List<Method> injectMethods = definition.getInjectMethods();
+        if (injectMethods != null) {
+            for (Method method : injectMethods) {
+                List<Object> args = getArgumentsFromBeanContainer(method);
+                try {
+                    method.invoke(bean, args.toArray());
+                } catch (Exception e) {
+                    throw new BeanException("invoke inject-methods method failed,because ?", e.getMessage());
+                }
+            }
+        }
     }
 
 

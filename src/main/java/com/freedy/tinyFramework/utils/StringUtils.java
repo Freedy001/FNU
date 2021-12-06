@@ -95,14 +95,14 @@ public class StringUtils {
     /**
      * 是否是大写字符
      */
-    private static boolean isUppercase(char c) {
+    public static boolean isUppercase(char c) {
         return c >= 65 && c <= 90;
     }
 
     /**
      * 是否是小写字符
      */
-    private static boolean isLowercase(char c) {
+    public static boolean isLowercase(char c) {
         return c >= 97 && c <= 122;
     }
 

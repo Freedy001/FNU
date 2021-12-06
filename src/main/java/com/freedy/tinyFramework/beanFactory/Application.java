@@ -16,6 +16,7 @@ public class Application extends AbstractApplication {
 
 
     public Application(Class<?> baseClass) {
+        System.out.println("bbbbbbbb");
         scanner = new BeanDefinitionScanner(baseClass, this);
         setBean(this);
     }

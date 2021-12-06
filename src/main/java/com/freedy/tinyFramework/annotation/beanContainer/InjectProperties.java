@@ -7,9 +7,8 @@ import java.lang.annotation.*;
  * @date 2021/12/5 16:01
  */
 @Documented
-@Target(ElementType.FIELD)
+@Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
-@Part(type = BeanType.SINGLETON,configure = false)
 public @interface InjectProperties {
     //属性前缀
     String value();

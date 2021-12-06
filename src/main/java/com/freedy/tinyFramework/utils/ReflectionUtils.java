@@ -298,22 +298,37 @@ public class ReflectionUtils {
         return false;
     }
 
-    public static  <T> T convertType(Object strValue,Class<T> type){
-        if (strValue==null) return null;
+
+    public static boolean isBasicType(Class<?> type) {
+        switch (type.getSimpleName()) {
+            case "Integer", "int", "Long", "long",
+                    "Double", "double", "Float", "float",
+                    "Boolean", "boolean", "short", "Short",
+                    "Byte", "byte", "Character", "char", "String" -> {
+                return true;
+            }
+            default -> {
+                return false;
+            }
+        }
+    }
+
+    public static <T> T convertType(Object strValue, Class<T> type) {
+        if (strValue == null) return null;
         Object returnValue;
         switch (type.getSimpleName()) {
-            case "Integer", "int" -> returnValue=Integer.parseInt(strValue.toString());
-            case "Long", "long" -> returnValue=Long.parseLong(strValue.toString());
-            case "Double", "double" -> returnValue=Double.parseDouble(strValue.toString());
-            case "Float", "float" -> returnValue=Float.parseFloat(strValue.toString());
-            case "Boolean", "boolean" -> returnValue=Boolean.parseBoolean(strValue.toString());
-            case "short", "Short" -> returnValue=Short.parseShort(strValue.toString());
-            case "Byte", "byte" ->returnValue=Byte.parseByte(strValue.toString());
-            case "Character", "char" -> returnValue=strValue.toString().charAt(0);
-            case "String" -> returnValue=strValue.toString();
-            default -> throw new UnsupportedOperationException("unsupported current type "+type.getName());
+            case "Integer", "int" -> returnValue = Integer.parseInt(strValue.toString());
+            case "Long", "long" -> returnValue = Long.parseLong(strValue.toString());
+            case "Double", "double" -> returnValue = Double.parseDouble(strValue.toString());
+            case "Float", "float" -> returnValue = Float.parseFloat(strValue.toString());
+            case "Boolean", "boolean" -> returnValue = Boolean.parseBoolean(strValue.toString());
+            case "short", "Short" -> returnValue = Short.parseShort(strValue.toString());
+            case "Byte", "byte" -> returnValue = Byte.parseByte(strValue.toString());
+            case "Character", "char" -> returnValue = strValue.toString().charAt(0);
+            case "String" -> returnValue = strValue.toString();
+            default -> throw new UnsupportedOperationException("unsupported current type " + type.getName());
         }
-        return type.cast(returnValue);
+        return (T) returnValue;
     }
 
 }

@@ -34,7 +34,6 @@ public abstract class DefaultBeanFactory implements BeanFactory {
         }
     }
 
-
     @Override
     public Object getBean(String beanName){
         return singletonObject.get(beanName);

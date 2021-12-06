@@ -9,7 +9,6 @@ import lombok.extern.slf4j.Slf4j;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.lang.reflect.Field;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Properties;
@@ -69,21 +68,6 @@ public class Context {
     //换行符
     public final static String LF = System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("win") ? "\r\n" : "\n";
 
-    public static void main(String[] args) throws IllegalAccessException {
-        for (Field field : LoadBalance.class.getDeclaredFields()) {
-
-            String s = field.getName()/*.toLowerCase(Locale.ROOT)*/;
-//            int lastIndex = 0;
-//            while (true) {
-//                int index = s.indexOf("_");
-//                if (index == -1) break;
-//                s = s.substring(lastIndex, index) + s.substring(index + 1, index + 2).toUpperCase(Locale.ROOT) + s.substring(index + 2);
-//            }
-            String simpleName = field.getType().getSimpleName();
-            System.out.println(s + " : " + (simpleName.equals("String") ? "string" : simpleName.equals("int") ? "number" : simpleName) + ",");
-
-        }
-    }
 
     static {
         System.out.println("""         

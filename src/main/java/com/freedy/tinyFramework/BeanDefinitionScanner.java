@@ -72,7 +72,7 @@ public class BeanDefinitionScanner implements Scanner {
                 }
                 InjectProperties properties = beanClass.getAnnotation(InjectProperties.class);
                 if (properties==null) continue;
-                String beanName = properties.value();
+                String beanName = properties.beanName();
                 if (StringUtils.isEmpty(beanName)) {
                     beanName = convertName(beanClass.getSimpleName());
                 }

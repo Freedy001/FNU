@@ -79,13 +79,11 @@ public class Start {
 //        if (Context.MANAGE_PORT != -1) {
 //            catchPortInUse(() -> ManagerServer.start(handler));
 //        }
-//        Application application = new Application(Start.class).run();
-//        for (String beanName : application.getAllBeanNames()) {
-//            System.out.println(beanName);
-//            Object bean = application.getBean(beanName);
-//            System.out.println(bean);
-//            log.info("next");
-//        }
+//        Class<Start> startClass = Start.class;
+//        Application application = new Application(startClass);
+//        application.run();
+//        Object bean = application.getBean(TestProp.class);
+//        System.out.println(JSON.toJSONString(bean));
 //        LockSupport.park();
 
     }
