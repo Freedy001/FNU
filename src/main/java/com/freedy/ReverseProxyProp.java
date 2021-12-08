@@ -1,6 +1,7 @@
 package com.freedy;
 
-import lombok.SneakyThrows;
+import com.freedy.tinyFramework.annotation.WebApplication;
+import com.freedy.tinyFramework.beanFactory.Application;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -8,15 +9,12 @@ import lombok.extern.slf4j.Slf4j;
  * @date 2021/12/6 21:59
  */
 @Slf4j
+@WebApplication(port = 9090)
 public class ReverseProxyProp {
 
 
-    @SneakyThrows
     public static void main(String[] args) {
-        Class<TestProp> aClass = TestProp.class;
-        Class<?> obj = aClass.getDeclaredField("testObj").getType();
-        Object o = obj.getConstructor().newInstance();
-        System.out.println(o);
+        Application application = new Application(ReverseProxyProp.class).run();
     }
 
 

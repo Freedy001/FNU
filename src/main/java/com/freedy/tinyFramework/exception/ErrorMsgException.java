@@ -1,4 +1,4 @@
-package com.freedy.manage.exception;
+package com.freedy.tinyFramework.exception;
 
 import lombok.Getter;
 

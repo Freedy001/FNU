@@ -4,11 +4,14 @@ import java.lang.annotation.*;
 
 /**
  * @author Freedy
- * @date 2021/12/2 15:24
+ * @date 2021/12/7 14:46
  */
 @Documented
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
-public @interface Interceptor {
-
+public @interface Aspect {
+    /**
+     * bean名称
+     */
+    String value() default "";
 }

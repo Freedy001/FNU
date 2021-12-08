@@ -9,6 +9,8 @@ import com.freedy.tinyFramework.beanFactory.AbstractApplication;
 public interface Scanner {
     void scan(String ...packagesName);
 
+    void scan(String[] packagesName,String[] exclude);
+
     AbstractApplication getApplication();
 
     void setApplication(AbstractApplication application);

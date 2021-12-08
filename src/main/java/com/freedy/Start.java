@@ -24,7 +24,7 @@ public class Start {
 
     public static class InfoMap extends HashMap<String, StartInfo> {
         public StartInfo put(String key, Channel value) {
-            return super.put(key, new StartInfo(value, System.currentTimeMillis()));
+            return put(key, new StartInfo(value, System.currentTimeMillis()));
         }
     }
 

@@ -4,6 +4,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.Arrays;
+
 /**
  * @author Freedy
  * @date 2021/11/29 10:11
@@ -31,6 +33,10 @@ public class Response {
 
     public static Response err(int code, String msg) {
         return new Response(code, msg, null);
+    }
+
+    public void okhaha(Object a,Object ...data){
+        System.out.println("okhaha"+ Arrays.toString(data));
     }
 
 }

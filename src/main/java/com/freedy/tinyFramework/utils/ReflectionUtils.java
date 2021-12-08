@@ -1,13 +1,13 @@
 package com.freedy.tinyFramework.utils;
 
 
+import com.freedy.tinyFramework.exception.BeanInitException;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
 import java.lang.annotation.Annotation;
 import java.lang.annotation.ElementType;
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
+import java.lang.reflect.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -298,6 +298,26 @@ public class ReflectionUtils {
         return false;
     }
 
+    public static Set<Class<?>> getInterfaceRecursion(Object o) {
+        Set<Class<?>> set = new HashSet<>();
+        getInterfaceRecursion(o.getClass(), set);
+        return set;
+    }
+
+    public static Set<Class<?>> getInterfaceRecursion(Class<?> clazz) {
+        Set<Class<?>> set = new HashSet<>();
+        getInterfaceRecursion(clazz, set);
+        return set;
+    }
+
+
+    public static void getInterfaceRecursion(Class<?> clazz, Collection<Class<?>> interfaces) {
+        for (Class<?> aClass : clazz.getInterfaces()) {
+            interfaces.add(aClass);
+            getInterfaceRecursion(aClass, interfaces);
+        }
+    }
+
 
     public static boolean isBasicType(Class<?> type) {
         switch (type.getSimpleName()) {
@@ -329,6 +349,103 @@ public class ReflectionUtils {
             default -> throw new UnsupportedOperationException("unsupported current type " + type.getName());
         }
         return (T) returnValue;
+    }
+
+
+    @SneakyThrows
+    public static Collection<Object> buildCollectionByType(Class<?> interfaceType) {
+        if (!isSonInterface(interfaceType, "java.util.Collection"))
+            throw new IllegalArgumentException("the type you give is not a collection type or son of collection type!");
+
+        if (!interfaceType.isInterface()) {
+            return (Collection<Object>) interfaceType.getConstructor().newInstance();
+        }
+        switch (interfaceType.getName()) {
+            case "java.util.List" -> {
+                return new ArrayList<>();
+            }
+            case "java.util.Set" -> {
+                return new HashSet<>();
+            }
+            case "java.util.Queue" -> {
+                return new ArrayDeque<>();
+            }
+            default -> throw new BeanInitException("unsupported type for type ?,please change a supported(List,Set,Queue) type");
+        }
+    }
+
+
+    /**
+     * 通过filed对象 与需要被设置的值进行 collection的构建
+     * @param field    通过field来获取满足其泛型的collection
+     * @param arg      用于对新collection进行赋值
+     * @return         新collection
+     */
+    public static Collection<Object> buildCollectionByFiledAndValue(Field field, String[] arg) {
+        Collection<Object> collection;
+
+        if (field.getGenericType() instanceof ParameterizedType parameterizedType) {
+            Type[] genericType = parameterizedType.getActualTypeArguments();
+            Class<?> listType = (Class<?>) genericType[0];
+            Class<?> rawType = (Class<?>) parameterizedType.getRawType();
+            //创建实例
+            collection = ReflectionUtils.buildCollectionByType(rawType);
+            if (arg==null) return collection;
+            for (String s : arg) {
+                collection.add(ReflectionUtils.convertType(s, listType));
+            }
+        } else {
+            //没有声明泛型 默认string
+            //创建实例
+            collection = ReflectionUtils.buildCollectionByType(field.getType());
+            if (arg==null) return collection;
+            collection.addAll(Arrays.asList(arg));
+        }
+        return collection;
+    }
+
+    /**
+     * 通过给定filed和给定map对来构建新的map。
+     * 其构建过程为，对给定map的符合给点前缀的键进行对新map赋值
+     * @param field    通过field来获取满足其泛型的map
+     * @param prefix   前缀
+     * @param valMap   用于给新map赋值的mao
+     * @return         新构建的map
+     */
+    @SuppressWarnings("unchecked")
+    public static Map<Object, Object> buildMapByFiledAndValue(Field field, String prefix, Map<String, String> valMap) throws Exception {
+        Map<Object, Object> map;
+        Class<?>[] _1stType = new Class[1];
+        Class<?>[] _2ndType = new Class[1];
+        if (field.getGenericType() instanceof ParameterizedType parameterizedType) {
+            Type[] genericType = parameterizedType.getActualTypeArguments();
+            _1stType[0] = (Class<?>) genericType[0];
+            _2ndType[0] = (Class<?>) genericType[1];
+            Class<?> rawType = (Class<?>) parameterizedType.getRawType();
+            if (!rawType.isInterface()) {
+                //非interface
+                map = (Map<Object, Object>) rawType.getConstructor().newInstance();
+            } else {
+                map = new HashMap<>();
+            }
+            valMap.forEach((key, v) -> {
+                if (key.startsWith(prefix)) {
+                    String mapKey = key.substring(prefix.length() + 1);
+                    map.put(ReflectionUtils.convertType(mapKey, _1stType[0]), ReflectionUtils.convertType(v, _2ndType[0]));
+                }
+            });
+
+        } else {
+            //没有声明泛型 默认string.string
+            map = new HashMap<>();
+            valMap.forEach((key, v) -> {
+                if (key.startsWith(prefix)) {
+                    String mapKey = key.substring(prefix.length() + 1);
+                    map.put(mapKey, v);
+                }
+            });
+        }
+        return map;
     }
 
 }

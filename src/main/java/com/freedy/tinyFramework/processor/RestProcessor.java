@@ -2,17 +2,15 @@ package com.freedy.tinyFramework.processor;
 
 import com.alibaba.fastjson.JSON;
 import com.freedy.manage.Response;
-import com.freedy.manage.exception.ErrorMsgException;
+import com.freedy.tinyFramework.RequestInterceptor;
 import com.freedy.tinyFramework.annotation.mvc.*;
-import com.freedy.tinyFramework.utils.DateUtils;
+import com.freedy.tinyFramework.beanFactory.BeanFactory;
+import com.freedy.tinyFramework.exception.ErrorMsgException;
 import com.freedy.tinyFramework.utils.ReflectionUtils;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.handler.codec.http.DefaultFullHttpResponse;
-import io.netty.handler.codec.http.FullHttpRequest;
-import io.netty.handler.codec.http.HttpResponseStatus;
-import io.netty.handler.codec.http.HttpVersion;
+import io.netty.handler.codec.http.*;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.SneakyThrows;
@@ -25,9 +23,9 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
-import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import static io.netty.handler.codec.http.HttpHeaderNames.*;
 
@@ -41,11 +39,15 @@ public class RestProcessor extends SimpleChannelInboundHandler<FullHttpRequest> 
 
     private final Map<String, ControllerMethod> requestHandleMapping = new HashMap<>();
     private final Map<String, Object> innerObject = new ConcurrentHashMap<>();
+    private final List<RequestInterceptor> interceptorList = new CopyOnWriteArrayList<>();
+
+    public RestProcessor(BeanFactory factory) {
+        interceptorList.addAll(factory.getBeansForType(RequestInterceptor.class));
+    }
 
     public void registerInnerObj(@NonNull Object innerObj) {
         innerObject.put(innerObj.getClass().getName(), innerObj);
     }
-
 
 
     @SneakyThrows
@@ -95,12 +97,12 @@ public class RestProcessor extends SimpleChannelInboundHandler<FullHttpRequest> 
         private final Method invokeMethod;
         private final Object instance;
         private final ThreadLocal<List<Object>> args = new ThreadLocal<>();
-        private final Set<String> baseType = new HashSet<>(List.of("int", "Integer", "long", "Long", "boolean", "Boolean", "byte", "Byte", "short", "Short", "char", "Char", "double", "Double", "float", "Float"));
 
 
         ControllerMethod(String httpMethod, Method method, Object instance) {
             ArgumentInfo[] argumentInfos = new ArgumentInfo[method.getParameterCount()];
             int index = 0;
+            //只能出现一个Body注解
             boolean firstBody = false;
             for (Parameter parameter : method.getParameters()) {
                 Param param = parameter.getAnnotation(Param.class);
@@ -113,18 +115,7 @@ public class RestProcessor extends SimpleChannelInboundHandler<FullHttpRequest> 
                     firstBody = true;
                     argumentInfos[index++] = new ArgumentInfo(parameter.getName(), body, parameter.getType());
                 } else {
-                    Class<?> type = parameter.getType();
-                    if (!baseType.contains(type.getSimpleName())) {
-                        //非基本类型
-                        for (Field field : type.getDeclaredFields()) {
-                            if (ReflectionUtils.isSonInterface(field.getType(), "java.util.Collection", "java.util.Map")) {
-                                //集合类型
-                                throw new UnsupportedOperationException("request param doesn't support Collection type or Map type");
-                            }
-                        }
-
-                    }
-                    argumentInfos[index++] = new ArgumentInfo(parameter.getName(), param, type);
+                    argumentInfos[index++] = new ArgumentInfo(parameter.getName(), param, parameter.getType());
                 }
             }
             method.setAccessible(true);
@@ -174,6 +165,9 @@ public class RestProcessor extends SimpleChannelInboundHandler<FullHttpRequest> 
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, FullHttpRequest req) throws Exception {
+        //执行前置拦截器
+        invokePreProcessor(req);
+
         HttpUrl httpUrl = new HttpUrl(req.uri());
         ControllerMethod method = requestHandleMapping.get(httpUrl.getUrl());
         if (method == null) {
@@ -188,20 +182,36 @@ public class RestProcessor extends SimpleChannelInboundHandler<FullHttpRequest> 
 
         Object invoke = method.invoke();
 
-
         DefaultFullHttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
         response.headers().set(CONTENT_TYPE, "application/json");
         response.headers().set(CONNECTION, "keep-alive");
         response.headers().set(SERVER, "FNU power by netty");
         response.headers().set(DATE, new Date());
-        response.headers().set(ACCESS_CONTROL_ALLOW_ORIGIN, "*");
-        response.headers().set(ACCESS_CONTROL_ALLOW_HEADERS, "*");
-        response.headers().set(ACCESS_CONTROL_ALLOW_METHODS, "*");
         byte[] bytes = JSON.toJSONBytes(invoke);
         response.headers().set(CONTENT_LENGTH, bytes.length);
         response.content().writeBytes(bytes);
+
+        //执行后置拦截器
+        invokePostProcessor(response);
+
         ctx.writeAndFlush(response);
     }
+
+
+    private void invokePreProcessor(FullHttpRequest request) {
+        //执行后置拦截器
+        for (RequestInterceptor interceptor : interceptorList) {
+            if (!interceptor.pre(request)) return;
+        }
+    }
+
+    private void invokePostProcessor(FullHttpResponse response) {
+        //执行后置拦截器
+        for (RequestInterceptor interceptor : interceptorList) {
+            if (!interceptor.post(response)) return;
+        }
+    }
+
 
     private void fillArguments(FullHttpRequest req, HttpUrl httpUrl, ControllerMethod method) throws Exception {
         for (ControllerMethod.ArgumentInfo argumentInfo : method.getArgumentInfos()) {
@@ -224,6 +234,8 @@ public class RestProcessor extends SimpleChannelInboundHandler<FullHttpRequest> 
                 continue;
             }
 
+            //是否标有Param注解 方便后面对对象的创建的验证
+            boolean hasParam = false;
             //请求参数request param
             boolean require = false;
             String parameterName = argumentInfo.name();
@@ -232,30 +244,31 @@ public class RestProcessor extends SimpleChannelInboundHandler<FullHttpRequest> 
                 if (!value.equals(""))
                     parameterName = value;
                 require = p.require();
+                hasParam = true;
             }
 
             String argClassName = paramClazz.getSimpleName();
+
             //非数组
             if (!paramClazz.isArray()) {
-                String arg = httpUrl.getParameter(parameterName);
-                if (arg == null && require) {
+
+                String httpUrlParameter = httpUrl.getParameter(parameterName);
+                if (httpUrlParameter == null && require) {
                     throw new IllegalArgumentException("parameter [" + parameterName + "] in method " + method.getInvokeMethod().getName() + " shouldn't be null");
                 }
 
-                switch (argClassName) {
-                    case "String" -> method.setArgument(arg);
-                    case "int", "Integer" -> method.setArgument(arg == null ? null : Integer.parseInt(arg));
-                    case "long", "Long" -> method.setArgument(arg == null ? null : Long.parseLong(arg));
-                    case "double", "Double" -> method.setArgument(arg == null ? null : Double.parseDouble(arg));
-                    case "boolean", "Boolean" -> method.setArgument(arg == null ? null : Boolean.parseBoolean(arg));
-                    case "Date" -> method.setArgument(arg == null ? null : new SimpleDateFormat("yyyy-MM-dd hh:mm:ss").parse(arg));
-                    default -> {
-                        Object o = paramClazz.getConstructor().newInstance();
-                        generateObj(o, paramClazz, httpUrl, "");
-                        method.setArgument(o);
-                    }
+                if (ReflectionUtils.isBasicType(paramClazz)) {
+                    method.setArgument(ReflectionUtils.convertType(httpUrlParameter, paramClazz));
+                } else if (ReflectionUtils.isSonInterface(paramClazz, "java.util.Collection", "java.util.Map")) {
+                    throw new UnsupportedOperationException("request param doesn't support Collection type or Map type");
+                } else {
+                    if (!hasParam) continue;
+                    Object o = paramClazz.getConstructor().newInstance();
+                    generateObj(o, paramClazz, httpUrl, "");
+                    method.setArgument(o);
                 }
                 continue;
+
             }
 
             //数组
@@ -307,23 +320,28 @@ public class RestProcessor extends SimpleChannelInboundHandler<FullHttpRequest> 
     private void generateObj(Object obj, Class<?> objClass, HttpUrl httpUrl, String fatherObjName) {
         try {
             for (Field field : objClass.getDeclaredFields()) {
-                String arg = httpUrl.getParameter(fatherObjName + field.getName());
-                Class<?> fieldClass = field.getType();
-                String fieldClassName = fieldClass.getSimpleName();
+                String propName = fatherObjName + field.getName();
+                Class<?> fieldType = field.getType();
                 field.setAccessible(true);
-                switch (fieldClassName) {
-                    case "String" -> field.set(obj, arg);
-                    case "int", "Integer" -> field.set(obj, arg == null ? null : Integer.parseInt(arg));
-                    case "long", "Long" -> field.set(obj, arg == null ? null : Long.parseLong(arg));
-                    case "double", "Double" -> field.set(obj, arg == null ? null : Double.parseDouble(arg));
-                    case "boolean", "Boolean" -> field.set(obj, arg == null ? null : Boolean.parseBoolean(arg));
-                    case "Date" -> field.set(obj, arg == null ? null : DateUtils.getDate(arg));
-                    default -> {
-                        Object subObj = fieldClass.getConstructor().newInstance();
-                        generateObj(subObj, fieldClass, httpUrl, fatherObjName + field.getName() + ".");
-                        field.set(obj, subObj);
-                    }
+
+                if (ReflectionUtils.isBasicType(fieldType)) {
+                    String arg = httpUrl.getParameter(propName);
+                    //属性注入
+                    field.set(obj, ReflectionUtils.convertType(arg, fieldType));
+                } else if (ReflectionUtils.isSonInterface(fieldType, "java.util.Collection")) {
+                    String[] arg = httpUrl.getMultiParameter(propName);
+                    if (arg == null) continue;
+                    //属性注入
+                    field.set(obj, ReflectionUtils.buildCollectionByFiledAndValue(field, arg));
+                } else if (ReflectionUtils.isSonInterface(fieldType, "java.util.Collection")) {
+                    //属性注入
+                    field.set(obj, ReflectionUtils.buildMapByFiledAndValue(field, propName, httpUrl.getOrigin()));
+                } else {
+                    Object subObj = fieldType.getConstructor().newInstance();
+                    generateObj(subObj, fieldType, httpUrl, fatherObjName + field.getName() + ".");
+                    field.set(obj, subObj);
                 }
+
             }
         } catch (Exception e) {
             throw new IllegalArgumentException(e);
@@ -331,10 +349,12 @@ public class RestProcessor extends SimpleChannelInboundHandler<FullHttpRequest> 
     }
 
 
+
+
     private static class HttpUrl {
         @Getter
         private final String url;
-        private final Map<String, String[]> parameters;
+        private final Map<String, String> parameters;
 
         HttpUrl(String rowUrl) {
             String rul = RestProcessor.getUrl(rowUrl);
@@ -345,24 +365,23 @@ public class RestProcessor extends SimpleChannelInboundHandler<FullHttpRequest> 
                 String[] parameterSplit = urlSplit[1].split("&");
                 for (String parameterUnit : parameterSplit) {
                     String[] parameterNameAndValue = parameterUnit.split("=", 2);
-                    String[] val = null;
-                    if (parameterNameAndValue.length == 2) {
-                        val = parameterNameAndValue[1].split(",");
-                    }
-                    parameters.put(parameterNameAndValue[0], val);
+                    parameters.put(parameterNameAndValue[0], parameterNameAndValue.length == 2 ? parameterNameAndValue[1] : null);
                 }
             } else parameters = null;
         }
 
         public String getParameter(String name) {
             if (parameters == null) return null;
-            String[] str = parameters.get(name);
-            return str == null ? null : str[0];
+            return parameters.get(name);
         }
 
         public String[] getMultiParameter(String name) {
             if (parameters == null) return null;
-            return parameters.get(name);
+            return parameters.get(name).split(",");
+        }
+
+        public Map<String, String> getOrigin() {
+            return parameters;
         }
 
     }
@@ -392,6 +411,7 @@ public class RestProcessor extends SimpleChannelInboundHandler<FullHttpRequest> 
         byte[] bytes = JSON.toJSONBytes(Response.err(code, msg));
         response.headers().set(CONTENT_LENGTH, bytes.length);
         response.content().writeBytes(bytes);
+        invokePostProcessor(response);
         ctx.writeAndFlush(response);
     }
 }

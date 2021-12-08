@@ -12,6 +12,7 @@ import lombok.EqualsAndHashCode;
 public class PropertiesBeanDefinition extends BeanDefinition{
     String prefix;
 
+
     public PropertiesBeanDefinition(String beanName, Class<?> beanClass, String prefix) {
         super(beanName, beanClass);
         this.prefix = prefix;

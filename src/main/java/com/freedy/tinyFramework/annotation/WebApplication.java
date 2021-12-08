@@ -7,14 +7,10 @@ import java.lang.annotation.Target;
 
 /**
  * @author Freedy
- * @date 2021/12/2 15:49
+ * @date 2021/12/8 16:23
  */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
-public @interface PackageScan {
-    //需要被扫描的包名称
-    String[] value();
-
-    //需要被排除的包名
-    String[] exclude() default {""};
+public @interface WebApplication {
+    int port();
 }

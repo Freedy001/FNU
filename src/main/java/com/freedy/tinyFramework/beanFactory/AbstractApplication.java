@@ -1,15 +1,15 @@
 package com.freedy.tinyFramework.beanFactory;
 
-import com.freedy.tinyFramework.DefaultBeanFactory;
 import com.freedy.tinyFramework.annotation.beanContainer.Bean;
 import com.freedy.tinyFramework.annotation.beanContainer.BeanType;
 import com.freedy.tinyFramework.annotation.beanContainer.Inject;
 import com.freedy.tinyFramework.beanDefinition.BeanDefinition;
 import com.freedy.tinyFramework.beanDefinition.ConfigBeanDefinition;
-import com.freedy.tinyFramework.beanDefinition.NormalBeanDefinition;
 import com.freedy.tinyFramework.beanDefinition.PropertiesBeanDefinition;
+import com.freedy.tinyFramework.beanDefinition.ProxyBeanDefinition;
 import com.freedy.tinyFramework.exception.*;
 import com.freedy.tinyFramework.processor.PropertiesExtractor;
+import com.freedy.tinyFramework.processor.ProxyProcessor;
 import com.freedy.tinyFramework.utils.LockProvider;
 import com.freedy.tinyFramework.utils.ReflectionUtils;
 import com.freedy.tinyFramework.utils.StringUtils;
@@ -44,6 +44,9 @@ public abstract class AbstractApplication extends DefaultBeanFactory {
             if (superClass.getName().equals("java.lang.Object")) continue;
             beanTypeDefinition.computeIfAbsent(superClass, k -> new ArrayList<>()).add(b);
         }
+        for (Class<?> superClass : ReflectionUtils.getInterfaceRecursion(b.getBeanClass())) {
+            beanTypeDefinition.computeIfAbsent(superClass, k -> new ArrayList<>()).add(b);
+        }
     }
 
 
@@ -54,7 +57,7 @@ public abstract class AbstractApplication extends DefaultBeanFactory {
         beanDefinition.forEach((name, definition) -> {
             beanDefinitionPostProcess(definition);
             //普通对象
-            if (definition.getType() == BeanType.SINGLETON) {
+            if (definition.getType() == BeanType.SINGLETON && !containsBean(name)) {
                 //普通单例对象
                 getBean(definition.getBeanName());
             }
@@ -100,7 +103,9 @@ public abstract class AbstractApplication extends DefaultBeanFactory {
 
 
     public <T> T getBean(Class<T> beanType) {
-        return beanType.cast(getBean(beanType, null));
+        T bean = super.getBean(beanType);
+        if (bean != null) return bean;
+        else return beanType.cast(getBean(beanType, null));
     }
 
     private Object getBean(Class<?> beanType, String beanName) {
@@ -156,56 +161,52 @@ public abstract class AbstractApplication extends DefaultBeanFactory {
             //检测是否需要被代理
             Object proxyBean = checkProxy(bean, definition);
 
+            if (proxyBean instanceof ProxyProcessor.ProxyMataInfo mataInfo) {
+                //设置原始对象
+                mataInfo.setOriginObj(bean);
+            }
+
             //放入二级缓存，表示该对象正在创建
             earlySingletonObject.put(beanName, proxyBean);
+
             for (Field field : ReflectionUtils.getFieldsRecursion(definition.getBeanClass())) {
                 Inject inject = field.getAnnotation(Inject.class);
                 if (inject == null) continue;
                 field.setAccessible(true);
-                String byName = inject.byName();
-                if (StringUtils.hasText(byName)) {
-                    //by name
-                    Object dependency = getBean(byName);
-                    if (dependency == null) {
-                        throw new NoSuchBeanException("can not find bean definition[name:?] in the container,please register one", byName);
-                    }
-                    try {
-                        field.set(bean, dependency);
-                    } catch (Exception e) {
-                        throw new InjectException("inject field ? failed,because ?", field.getName(), e.getMessage());
-                    }
-                    continue;
-                }
-                //by type
                 Class<?> type = field.getType();
-                List<BeanDefinition> definitionList = beanTypeDefinition.get(type);
-                if (definitionList == null) continue;
-                if (definitionList.size() == 1) {
-                    Object dependency = getBean(definitionList.get(0).getBeanName());
+
+                //by name inject
+                String dependencyBeanName = inject.byName();
+                Object dependency;
+                if (StringUtils.hasText(dependencyBeanName)) {
+                    //获取bean
+                    dependency = getBean(dependencyBeanName);
                     if (dependency == null) {
-                        throw new NoSuchBeanException("can not find bean definition[type:?] in the container,please register one", type.getName());
+                        throw new NoSuchBeanException("can not find bean definition[name:?] in the container,please register one", dependencyBeanName);
                     }
                     try {
+                        //转换对代理类型的bean进行转换
+                        dependency = checkAndConvertProxyType(type, dependency, dependencyBeanName);
+                        //属性注入
                         field.set(bean, dependency);
                     } catch (Exception e) {
                         throw new InjectException("inject field ? failed,because ?", field.getName(), e.getMessage());
                     }
                     continue;
                 }
-                String name = field.getName();
-                BeanDefinition normalBeanDefinition = this.beanDefinition.get(name);
-                if (normalBeanDefinition == null)
-                    throw new NoUniqueBeanException("find " + definitionList.size() + " " + type.getName() + " in the bean definition container,you should specify one");
-                Object dependency = getBean(normalBeanDefinition.getBeanName());
+                //by type inject
+                dependency = getBean(type, field.getName());
                 if (dependency == null) {
                     throw new NoSuchBeanException("can not find bean definition[type:?] in the container,please register one", type.getName());
                 }
                 try {
+                    //转换对代理类型的bean进行转换
+                    dependency = checkAndConvertProxyType(type, dependency, dependencyBeanName);
+                    //属性注入
                     field.set(bean, dependency);
                 } catch (Exception e) {
                     throw new InjectException("inject field ? failed,because ?", field.getName(), e.getMessage());
                 }
-
             }
             //执行PostConstruct 和 inject方法
             invokePostConstruct(bean, definition);
@@ -219,18 +220,41 @@ public abstract class AbstractApplication extends DefaultBeanFactory {
                 registerBean(beanName, proxyBean);
             }
 
-            return proxyBean;
+            if (proxyBean instanceof ProxyProcessor.ProxyMataInfo proxyMataInfo)
+                return proxyMataInfo.getProxyObj();
+            else
+                return proxyBean;
         }
+    }
+
+    private Object checkAndConvertProxyType(Class<?> fieldDependencyType, Object dependency, String dependencyBeanName) {
+        if (!fieldDependencyType.isInstance(dependency)) {
+            //不能转换可能是jdk动态代理产生的类
+            if (dependency instanceof ProxyProcessor.ProxyMataInfo mataInfo) {
+                //表示该对象产生了循环依赖 需要从二级缓存中拿到，而二级缓存中的代理对象是ProxyMataInfo类型
+                dependency = mataInfo.getProxyObj();
+                if (!fieldDependencyType.isInstance(dependency)) {
+                    //不能转换拿起原始类型
+                    dependency = mataInfo.getOriginObj();
+                    if (fieldDependencyType.isInstance(dependency)) {
+                        //日志提醒
+                        log.warn("""
+                                It is detected that the bean[name:{},type{}] you want to get is a bean that needs to be JDK-dynamic proxied,
+                                but the type you use to receive the bean is a non interface type. So this bean will not be enhanced!
+                                """, dependencyBeanName, fieldDependencyType.getName());
+                    }
+                }
+            } else {
+                //直接从容器中拿到原始对象
+                dependency = getBean(dependencyBeanName, fieldDependencyType);
+            }
+        }
+        return dependency;
     }
 
     private Object createBeanByConstructor(BeanDefinition definition) {
         try {
             Object bean = null;
-            //处理NormalBeanDefinition
-            if (definition instanceof NormalBeanDefinition) {
-                //处理普通bean
-                bean = injectByConstruct(definition.getBeanClass());
-            }
             //处理ConfigBeanDefinition
             if (definition instanceof ConfigBeanDefinition configDefinition) {
                 Bean info = configDefinition.getBeanInfo();
@@ -280,10 +304,16 @@ public abstract class AbstractApplication extends DefaultBeanFactory {
                 //普通注入
                 bean = injectByConstruct(definition.getBeanClass());
                 //属性注入
-                propertiesExtractor.injectProperties(propDefinition.getPrefix(), bean);
+                propertiesExtractor.injectProperties(propDefinition.getPrefix(), bean, true);
+            }
+            if (bean == null) {
+                //处理普通bean
+                bean = injectByConstruct(definition.getBeanClass());
             }
             return bean;
-        } catch (Exception e) {
+        } catch (BeanException e) {
+            throw e;
+        } catch (Throwable e) {
             throw new BeanException("create instance failed,because ?", e);
         }
     }
@@ -361,11 +391,21 @@ public abstract class AbstractApplication extends DefaultBeanFactory {
     }
 
 
+
     /**
      * 检测对象是否需要被代理
      */
     private Object checkProxy(Object bean, BeanDefinition definition) {
-        return bean;
+        String beanClassName = definition.getBeanClass().getName();
+        List<ProxyBeanDefinition.MataInterceptor> interceptor = new ArrayList<>();
+        for (BeanDefinition value : beanDefinition.values()) {
+            if (value instanceof ProxyBeanDefinition proxyBeanDefinition) {
+                interceptor.addAll(proxyBeanDefinition.getConditionalIntercept(beanClassName));
+            }
+        }
+        if (interceptor.isEmpty()) return bean;
+
+        return new ProxyProcessor(bean, this, interceptor).getProxy();
     }
 
 
