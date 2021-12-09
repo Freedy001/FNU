@@ -2,6 +2,9 @@ package com.freedy.intranetPenetration.local;
 
 import com.freedy.Context;
 import com.freedy.errorProcessor.ErrorHandler;
+import com.freedy.tinyFramework.annotation.beanContainer.BeanType;
+import com.freedy.tinyFramework.annotation.beanContainer.Inject;
+import com.freedy.tinyFramework.annotation.beanContainer.Part;
 import com.freedy.utils.ChannelUtils;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
@@ -13,16 +16,20 @@ import lombok.extern.slf4j.Slf4j;
  * @date 2021/11/17 14:46
  */
 @Slf4j
+@Part(type = BeanType.PROTOTYPE)
 public class RequestListener extends ChannelInboundHandlerAdapter {
 
     private Channel localServerChannel;
     private int spin=0;
     private long lastCircleTime=System.currentTimeMillis();
 
+    @Inject
+    private ClientConnector clientConnector;
+
     @Override
     public void channelActive(ChannelHandlerContext ctx) {
         Channel remoteChannel = ctx.channel();
-        localServerChannel = ClientConnector.localServerConnect(ChannelUtils.getGroup(remoteChannel), remoteChannel);
+        localServerChannel = clientConnector.localServerConnect(ChannelUtils.getGroup(remoteChannel), remoteChannel);
         if (localServerChannel != null)
             log.info("[INTRANET-LOCAL-SERVER]: Preparing to connect to the localServer[{}] for remoteServer[{}]", localServerChannel.remoteAddress().toString().substring(1), remoteChannel.remoteAddress().toString().substring(1));
     }

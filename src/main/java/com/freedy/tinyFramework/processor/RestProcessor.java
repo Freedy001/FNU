@@ -5,6 +5,7 @@ import com.freedy.manage.Response;
 import com.freedy.tinyFramework.RequestInterceptor;
 import com.freedy.tinyFramework.annotation.mvc.*;
 import com.freedy.tinyFramework.beanFactory.BeanFactory;
+import com.freedy.tinyFramework.beanFactory.DefaultBeanFactory;
 import com.freedy.tinyFramework.exception.ErrorMsgException;
 import com.freedy.tinyFramework.utils.ReflectionUtils;
 import io.netty.channel.ChannelHandler;
@@ -43,6 +44,14 @@ public class RestProcessor extends SimpleChannelInboundHandler<FullHttpRequest> 
 
     public RestProcessor(BeanFactory factory) {
         interceptorList.addAll(factory.getBeansForType(RequestInterceptor.class));
+        if (factory instanceof DefaultBeanFactory defaultBeanFactory) {
+            defaultBeanFactory.registerBeanAddNotifier((beanFactory, beanName) -> {
+                Object bean = beanFactory.getBean(beanName);
+                if (bean instanceof RequestInterceptor beanInterceptor) {
+                    interceptorList.add(beanInterceptor);
+                }
+            });
+        }
     }
 
     public void registerInnerObj(@NonNull Object innerObj) {
@@ -168,17 +177,17 @@ public class RestProcessor extends SimpleChannelInboundHandler<FullHttpRequest> 
         //执行前置拦截器
         invokePreProcessor(req);
 
-        HttpUrl httpUrl = new HttpUrl(req.uri());
-        ControllerMethod method = requestHandleMapping.get(httpUrl.getUrl());
+        UrlParser urlParser = new UrlParser(req.uri());
+        ControllerMethod method = requestHandleMapping.get(urlParser.getUrl());
         if (method == null) {
-            log.error("the request url[{}] is not exist", httpUrl.url);
+            log.error("the request url[{}] is not exist", urlParser.url);
             responseError(ctx, 404, "the url your request is not exist");
             return;
         }
         if (!method.getHttpMethodName().contains(req.method().name().toLowerCase(Locale.ROOT)))
-            throw new IllegalArgumentException("The request which url is " + httpUrl.getUrl() + " should be " + method.getHttpMethodName() + " method but it is actually " + req.method().name().toLowerCase(Locale.ROOT) + " method");
+            throw new IllegalArgumentException("The request which url is " + urlParser.getUrl() + " should be " + method.getHttpMethodName() + " method but it is actually " + req.method().name().toLowerCase(Locale.ROOT) + " method");
 
-        fillArguments(req, httpUrl, method);
+        fillArguments(req, urlParser, method);
 
         Object invoke = method.invoke();
 
@@ -213,7 +222,7 @@ public class RestProcessor extends SimpleChannelInboundHandler<FullHttpRequest> 
     }
 
 
-    private void fillArguments(FullHttpRequest req, HttpUrl httpUrl, ControllerMethod method) throws Exception {
+    private void fillArguments(FullHttpRequest req, UrlParser urlParser, ControllerMethod method) throws Exception {
         for (ControllerMethod.ArgumentInfo argumentInfo : method.getArgumentInfos()) {
             Class<?> paramClazz = argumentInfo.clazz();
             //请求体
@@ -247,15 +256,13 @@ public class RestProcessor extends SimpleChannelInboundHandler<FullHttpRequest> 
                 hasParam = true;
             }
 
-            String argClassName = paramClazz.getSimpleName();
+            String httpUrlParameter = urlParser.getParameter(parameterName);
+            if (httpUrlParameter == null && require) {
+                throw new IllegalArgumentException("parameter [" + parameterName + "] in method " + method.getInvokeMethod().getName() + " shouldn't be null");
+            }
 
             //非数组
             if (!paramClazz.isArray()) {
-
-                String httpUrlParameter = httpUrl.getParameter(parameterName);
-                if (httpUrlParameter == null && require) {
-                    throw new IllegalArgumentException("parameter [" + parameterName + "] in method " + method.getInvokeMethod().getName() + " shouldn't be null");
-                }
 
                 if (ReflectionUtils.isBasicType(paramClazz)) {
                     method.setArgument(ReflectionUtils.convertType(httpUrlParameter, paramClazz));
@@ -264,7 +271,7 @@ public class RestProcessor extends SimpleChannelInboundHandler<FullHttpRequest> 
                 } else {
                     if (!hasParam) continue;
                     Object o = paramClazz.getConstructor().newInstance();
-                    generateObj(o, paramClazz, httpUrl, "");
+                    generateObj(o, paramClazz, urlParser, "");
                     method.setArgument(o);
                 }
                 continue;
@@ -272,52 +279,11 @@ public class RestProcessor extends SimpleChannelInboundHandler<FullHttpRequest> 
             }
 
             //数组
-            String[] multiArg = httpUrl.getMultiParameter(parameterName);
-            if (multiArg == null && require) {
-                throw new IllegalArgumentException("parameter [" + parameterName + "] in method " + method.getInvokeMethod().getName() + " shouldn't be null");
-            }
-            if (multiArg == null) {
-                method.setArgument(null);
-                continue;
-            }
-            String className = argClassName.replace("[]", "");
-            switch (className) {
-                case "String" -> method.setArgument(multiArg);
-                case "int" -> {
-                    int[] arg = new int[multiArg.length];
-                    for (int i = 0; i < multiArg.length; i++) {
-                        arg[i] = Integer.parseInt(multiArg[i]);
-                    }
-                    method.setArgument(arg);
-                }
-                case "Integer" -> {
-                    Integer[] arg = new Integer[multiArg.length];
-                    for (int i = 0; i < multiArg.length; i++) {
-                        arg[i] = Integer.parseInt(multiArg[i]);
-                    }
-                    method.setArgument(arg);
-                }
-                case "long" -> {
-                    long[] arg = new long[multiArg.length];
-                    for (int i = 0; i < multiArg.length; i++) {
-                        arg[i] = Long.parseLong(multiArg[i]);
-                    }
-                    method.setArgument(arg);
-                }
-                case "Long" -> {
-                    Long[] arg = new Long[multiArg.length];
-                    for (int i = 0; i < multiArg.length; i++) {
-                        arg[i] = Long.parseLong(multiArg[i]);
-                    }
-                    method.setArgument(arg);
-                }
-                default -> throw new UnsupportedOperationException("the parameter in " + method.getInvokeMethod().getName() + " type " + className + "[] is not support!");
-            }
-
+            method.setArgument(ReflectionUtils.buildArrByArrFieldAndVal(paramClazz, httpUrlParameter == null ? null : httpUrlParameter.split(",")));
         }
     }
 
-    private void generateObj(Object obj, Class<?> objClass, HttpUrl httpUrl, String fatherObjName) {
+    private void generateObj(Object obj, Class<?> objClass, UrlParser urlParser, String fatherObjName) {
         try {
             for (Field field : objClass.getDeclaredFields()) {
                 String propName = fatherObjName + field.getName();
@@ -325,20 +291,20 @@ public class RestProcessor extends SimpleChannelInboundHandler<FullHttpRequest> 
                 field.setAccessible(true);
 
                 if (ReflectionUtils.isBasicType(fieldType)) {
-                    String arg = httpUrl.getParameter(propName);
+                    String arg = urlParser.getParameter(propName);
                     //属性注入
                     field.set(obj, ReflectionUtils.convertType(arg, fieldType));
                 } else if (ReflectionUtils.isSonInterface(fieldType, "java.util.Collection")) {
-                    String[] arg = httpUrl.getMultiParameter(propName);
+                    String[] arg = urlParser.getMultiParameter(propName);
                     if (arg == null) continue;
                     //属性注入
                     field.set(obj, ReflectionUtils.buildCollectionByFiledAndValue(field, arg));
                 } else if (ReflectionUtils.isSonInterface(fieldType, "java.util.Collection")) {
                     //属性注入
-                    field.set(obj, ReflectionUtils.buildMapByFiledAndValue(field, propName, httpUrl.getOrigin()));
+                    field.set(obj, ReflectionUtils.buildMapByFiledAndValue(field, propName, urlParser.getOrigin()));
                 } else {
                     Object subObj = fieldType.getConstructor().newInstance();
-                    generateObj(subObj, fieldType, httpUrl, fatherObjName + field.getName() + ".");
+                    generateObj(subObj, fieldType, urlParser, fatherObjName + field.getName() + ".");
                     field.set(obj, subObj);
                 }
 
@@ -349,14 +315,12 @@ public class RestProcessor extends SimpleChannelInboundHandler<FullHttpRequest> 
     }
 
 
-
-
-    private static class HttpUrl {
+    private static class UrlParser {
         @Getter
         private final String url;
         private final Map<String, String> parameters;
 
-        HttpUrl(String rowUrl) {
+        UrlParser(String rowUrl) {
             String rul = RestProcessor.getUrl(rowUrl);
             String[] urlSplit = rul.split("\\?", 2);
             url = urlSplit[0];

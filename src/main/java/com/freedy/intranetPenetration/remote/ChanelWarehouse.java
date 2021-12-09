@@ -1,11 +1,14 @@
 package com.freedy.intranetPenetration.remote;
 
-import com.freedy.Context;
 import com.freedy.Struct;
 import com.freedy.intranetPenetration.OccupyState;
 import com.freedy.intranetPenetration.Protocol;
 import com.freedy.loadBalancing.LoadBalance;
 import com.freedy.loadBalancing.LoadBalanceFactory;
+import com.freedy.tinyFramework.annotation.beanContainer.BeanType;
+import com.freedy.tinyFramework.annotation.beanContainer.Inject;
+import com.freedy.tinyFramework.annotation.beanContainer.Part;
+import com.freedy.tinyFramework.beanFactory.BeanFactory;
 import com.freedy.utils.ChannelUtils;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
@@ -13,7 +16,6 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 
 /**
@@ -21,9 +23,18 @@ import java.util.concurrent.ConcurrentHashMap;
  * @date 2021/11/17 17:03
  */
 @Slf4j
+@Part(type = BeanType.PROTOTYPE)
 public class ChanelWarehouse extends SimpleChannelInboundHandler<Struct.ConfigGroup> {
+    //对外提供服务的 父管道
+    @Inject("remoteServerForBrowserParentChannel")
+    private Map<Integer,Channel> remoteServerForBrowserParentChannel;
     //管道缓存
-    public final static Map<Integer, LoadBalance<Channel>> PORT_CHANNEL_CACHE = new ConcurrentHashMap<>();
+    @Inject("portChannelCache")
+    private Map<Integer, LoadBalance<Channel>> portChannelCache;
+    @Inject
+    private BeanFactory factory;
+    @Inject
+    private RemoteProp prop;
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, Struct.ConfigGroup group) {
@@ -31,28 +42,27 @@ public class ChanelWarehouse extends SimpleChannelInboundHandler<Struct.ConfigGr
         Channel channel = ctx.channel();
         //初始化 管道池
         int serverPort = group.getRemoteServerPort();
-        LoadBalance<Channel> loadBalance = ChanelWarehouse.PORT_CHANNEL_CACHE.get(serverPort);
+        LoadBalance<Channel> loadBalance = portChannelCache.get(serverPort);
         createLB:
         if (loadBalance == null) {
-            synchronized (PORT_CHANNEL_CACHE) {
-                if ((loadBalance = ChanelWarehouse.PORT_CHANNEL_CACHE.get(serverPort)) != null) break createLB;
-                assert Context.PORT_CHANNEL_CACHE_LB_NAME != null;
-                loadBalance = LoadBalanceFactory.produce(Context.PORT_CHANNEL_CACHE_LB_NAME);
+            synchronized (ChanelWarehouse.class) {
+                if ((loadBalance = portChannelCache.get(serverPort)) != null) break createLB;
+                loadBalance = LoadBalanceFactory.produce(prop.getLoadBalancing());
                 loadBalance.registerShutdownHook(() -> {
-                    PORT_CHANNEL_CACHE.remove(serverPort);
+                    portChannelCache.remove(serverPort);
                     OccupyState.removeTaskQueue(serverPort);
-                    ServerHandshake.PORT_STARTED.get(serverPort).close().addListener(future -> {
+                    remoteServerForBrowserParentChannel.get(serverPort).close().addListener(future -> {
                         if (future.isSuccess()) {
                             log.info("shutdown success! server on port: {}", serverPort);
                         }
                     });
                 });
-                ChanelWarehouse.PORT_CHANNEL_CACHE.put(serverPort, loadBalance);
+                portChannelCache.put(serverPort, loadBalance);
                 OccupyState.initTaskQueue(serverPort);
             }
         }
         loadBalance.addElement(channel);
-        ChannelUtils.setOccupy(channel, new OccupyState(channel, serverPort));
+        ChannelUtils.setOccupy(channel, new OccupyState(channel, serverPort,factory));
         ChannelUtils.setGroup(channel, group);
 
         channel.writeAndFlush(Protocol.ACK);

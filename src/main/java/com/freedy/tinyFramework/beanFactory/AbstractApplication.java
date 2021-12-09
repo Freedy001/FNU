@@ -18,10 +18,7 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
 import java.lang.reflect.*;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -39,13 +36,18 @@ public abstract class AbstractApplication extends DefaultBeanFactory {
     protected final PropertiesExtractor propertiesExtractor = new PropertiesExtractor();
 
     public void registerBeanDefinition(BeanDefinition b) {
-        beanDefinition.put(b.getBeanName(), b);
+        BeanDefinition containerBeanDef = beanDefinition.put(b.getBeanName(), b);
+        if (containerBeanDef != null) {
+            throw new NoUniqueBeanException("same beanDefinition name[?]! your beanDefinition[type:?,beanType:?] container beanDefinition:[type:?,beanType:?] ",b.getBeanName(), b.getClass().getSimpleName(), b.getBeanClass().getName(), containerBeanDef.getClass().getSimpleName(), containerBeanDef.getBeanClass().getName());
+        }
+        Set<Class<?>> set = new HashSet<>();
         for (Class<?> superClass : ReflectionUtils.getClassRecursion(b.getBeanClass())) {
             if (superClass.getName().equals("java.lang.Object")) continue;
             beanTypeDefinition.computeIfAbsent(superClass, k -> new ArrayList<>()).add(b);
+            set.addAll(ReflectionUtils.getInterfaceRecursion(superClass));
         }
-        for (Class<?> superClass : ReflectionUtils.getInterfaceRecursion(b.getBeanClass())) {
-            beanTypeDefinition.computeIfAbsent(superClass, k -> new ArrayList<>()).add(b);
+        for (Class<?> interfaceClass : set) {
+            beanTypeDefinition.computeIfAbsent(interfaceClass, k -> new ArrayList<>()).add(b);
         }
     }
 
@@ -71,7 +73,7 @@ public abstract class AbstractApplication extends DefaultBeanFactory {
         for (Field field : ReflectionUtils.getFieldsRecursion(bean.getClass())) {
             Inject inject = field.getAnnotation(Inject.class);
             if (inject == null) continue;
-            String byName = inject.byName();
+            String byName = inject.value();
             if (StringUtils.hasText(byName)) {
                 //by name
                 field.setAccessible(true);
@@ -93,22 +95,33 @@ public abstract class AbstractApplication extends DefaultBeanFactory {
     }
 
     private List<Object> getArgumentsFromBeanContainer(Executable method) {
+        method.setAccessible(true);
         List<Object> arguments = new ArrayList<>(method.getParameterCount());
         for (Parameter parameter : method.getParameters()) {
             Class<?> type = parameter.getType();
-            arguments.add(getBean(type, parameter.getName()));
+            Inject inject = parameter.getAnnotation(Inject.class);
+            String paramName = parameter.getName();
+            arguments.add(getBean(type, inject == null ? paramName : StringUtils.hasText(inject.value()) ? inject.value() : paramName));
         }
         return arguments;
     }
 
 
     public <T> T getBean(Class<T> beanType) {
-        T bean = super.getBean(beanType);
-        if (bean != null) return bean;
-        else return beanType.cast(getBean(beanType, null));
+        return beanType.cast(getBean(beanType, null));
     }
 
+    /**
+     * 类型有限注入
+     */
     private Object getBean(Class<?> beanType, String beanName) {
+        try {
+            //尝试从 bean容器中获取
+            Object bean = super.getBean(beanType);
+            if (bean != null) return bean;
+        } catch (Exception ignored) {
+        }
+
         List<?> list = getBeansForType(beanType);
         if (list == null || list.size() == 0) {
             //可能是多例
@@ -119,20 +132,20 @@ public abstract class AbstractApplication extends DefaultBeanFactory {
             //多例/单例对象 开始生产
             if (definitions.size() == 1) return getBean(definitions.get(0).getBeanName());
             if (beanName == null) {
-                throw new NoUniqueBeanException("find ? bean definition[type:?] in the bean definition container!", definitions.size(), beanType.getName());
+                throw new NoUniqueBeanException("find ? bean definition[type:?] in the bean definition container! please specify one!", definitions.size(), beanType.getName());
             }
             BeanDefinition definition = this.beanDefinition.get(beanName);
             //通过名称找到能够进行生产的bean definition
             if (definition != null && definition.getBeanClass() == beanType) return getBean(definition.getBeanName());
-            throw new NoUniqueBeanException("find ? bean definition[type:?] in the bean definition container!", definitions.size(), beanType.getName());
+            throw new NoUniqueBeanException("find ? bean definition[type:?] in the bean definition container! please specify one!", definitions.size(), beanType.getName());
         }
         if (list.size() == 1) return list.get(0);
         if (beanName == null) {
-            throw new NoUniqueBeanException("find ? bean[type:?] in the bean definition container!", list.size(), beanType.getName());
+            throw new NoUniqueBeanException("find ? bean[type:?] in the bean definition container! please specify one!", list.size(), beanType.getName());
         }
         Object bean = getBean(beanName);
-        if (bean != null && bean.getClass() == beanType) return bean;
-        throw new NoUniqueBeanException("find ? bean[type:?] in the bean definition container!", list.size(), beanType.getName());
+        if (beanType.isInstance(bean)) return bean;
+        throw new NoUniqueBeanException("find ? bean[type:?] in the bean definition container! please specify one!", list.size(), beanType.getName());
     }
 
 
@@ -155,8 +168,15 @@ public abstract class AbstractApplication extends DefaultBeanFactory {
 
             if ((bean = beanBeforeCreatedPostProcess(definition)) != null) return bean;
 
-            //bean的初始化-调用构造函数
-            bean = createBeanByConstructor(definition);
+            try {
+                //bean的初始化-调用构造函数
+                bean = createBeanByConstructor(definition);
+            } catch (Exception e) {
+                throw new BeanInitException("create bean[name:?] failed,because ?", beanName, e);
+            }
+
+            //仅仅只能在这返回null
+            if (bean == null) return null;
 
             //检测是否需要被代理
             Object proxyBean = checkProxy(bean, definition);
@@ -176,7 +196,7 @@ public abstract class AbstractApplication extends DefaultBeanFactory {
                 Class<?> type = field.getType();
 
                 //by name inject
-                String dependencyBeanName = inject.byName();
+                String dependencyBeanName = inject.value();
                 Object dependency;
                 if (StringUtils.hasText(dependencyBeanName)) {
                     //获取bean
@@ -190,7 +210,7 @@ public abstract class AbstractApplication extends DefaultBeanFactory {
                         //属性注入
                         field.set(bean, dependency);
                     } catch (Exception e) {
-                        throw new InjectException("inject field ? failed,because ?", field.getName(), e.getMessage());
+                        throw new InjectException("inject field ? failed,because ?", field.getName(), e);
                     }
                     continue;
                 }
@@ -205,7 +225,7 @@ public abstract class AbstractApplication extends DefaultBeanFactory {
                     //属性注入
                     field.set(bean, dependency);
                 } catch (Exception e) {
-                    throw new InjectException("inject field ? failed,because ?", field.getName(), e.getMessage());
+                    throw new InjectException("inject field ? failed,because ?", field.getName(), e);
                 }
             }
             //执行PostConstruct 和 inject方法
@@ -218,6 +238,8 @@ public abstract class AbstractApplication extends DefaultBeanFactory {
             if (definition.getType() == BeanType.SINGLETON) {
                 //放入容器
                 registerBean(beanName, proxyBean);
+            } else {
+                log.debug("produce a PROTOTYPE bean({})", beanName);
             }
 
             if (proxyBean instanceof ProxyProcessor.ProxyMataInfo proxyMataInfo)
@@ -255,6 +277,7 @@ public abstract class AbstractApplication extends DefaultBeanFactory {
     private Object createBeanByConstructor(BeanDefinition definition) {
         try {
             Object bean = null;
+            boolean hasConstruct = false;
             //处理ConfigBeanDefinition
             if (definition instanceof ConfigBeanDefinition configDefinition) {
                 Bean info = configDefinition.getBeanInfo();
@@ -288,7 +311,6 @@ public abstract class AbstractApplication extends DefaultBeanFactory {
 
                 List<Object> args = getArgumentsFromBeanContainer(method);
                 try {
-                    method.setAccessible(true);
                     bean = method.invoke(getBean(method.getDeclaringClass()), args.toArray());
                 } catch (Exception e) {
                     log.error("invoke bean factory method error,because {}", e.getMessage());
@@ -296,17 +318,21 @@ public abstract class AbstractApplication extends DefaultBeanFactory {
                 }
 
                 if (bean == null) {
-                    throw new NoSuchBeanException("can't acquire config bean ?,because the factory method's return value is null!", definition.getBeanName());
+                    log.warn("can't acquire config bean {},because the factory method's return value is null!", definition.getBeanName());
                 }
+                hasConstruct = true;
             }
             //处理PropertiesBeanDefinition
             if (definition instanceof PropertiesBeanDefinition propDefinition) {
                 //普通注入
                 bean = injectByConstruct(definition.getBeanClass());
                 //属性注入
-                propertiesExtractor.injectProperties(propDefinition.getPrefix(), bean, true);
+                if (!propertiesExtractor.injectProperties(propDefinition.getPrefix(), bean)) {
+                    bean = null;
+                }
+                hasConstruct = true;
             }
-            if (bean == null) {
+            if (!hasConstruct) {
                 //处理普通bean
                 bean = injectByConstruct(definition.getBeanClass());
             }
@@ -324,7 +350,6 @@ public abstract class AbstractApplication extends DefaultBeanFactory {
         Constructor<?> injectConstructor = null;
         //获取有参构造，并且仅仅获取一个
         for (Constructor<?> constructor : constructors) {
-            constructor.setAccessible(true);
             Inject inject = constructor.getAnnotation(Inject.class);
             if (inject != null) {
                 if (injectConstructor != null) {
@@ -337,9 +362,9 @@ public abstract class AbstractApplication extends DefaultBeanFactory {
         if (injectConstructor != null) {
             List<Object> constructorArgs = getArgumentsFromBeanContainer(injectConstructor);
             try {
-                configBean = injectConstructor.newInstance(constructorArgs);
+                configBean = injectConstructor.newInstance(constructorArgs.toArray());
             } catch (Exception e) {
-                throw new BeanInitException("can't init bean[type:?] because ?", beanType.getName(), e.getMessage());
+                throw new BeanInitException("can't init bean[type:?] because ?", beanType.getName(), e);
             }
         } else {
             //重新寻找
@@ -352,9 +377,9 @@ public abstract class AbstractApplication extends DefaultBeanFactory {
             if (injectConstructor != null) {
                 List<Object> constructorArgs = getArgumentsFromBeanContainer(injectConstructor);
                 try {
-                    configBean = injectConstructor.newInstance(constructorArgs);
+                    configBean = injectConstructor.newInstance(constructorArgs.toArray());
                 } catch (Exception e) {
-                    throw new BeanInitException("can't init bean[type:?] because ?", beanType.getName(), e.getMessage());
+                    throw new BeanInitException("can't init bean[type:?] because ?", beanType.getName(), e);
                 }
             } else {
                 try {
@@ -374,7 +399,7 @@ public abstract class AbstractApplication extends DefaultBeanFactory {
             try {
                 postConstruct.invoke(bean);
             } catch (Exception e) {
-                throw new BeanException("invoke post-construct method failed,because ?", e.getCause() == null ? e.getMessage() : e.getCause());
+                throw new BeanException("invoke post-construct method[?] failed,because ?", postConstruct, e);
             }
         }
         List<Method> injectMethods = definition.getInjectMethods();
@@ -384,7 +409,7 @@ public abstract class AbstractApplication extends DefaultBeanFactory {
                 try {
                     method.invoke(bean, args.toArray());
                 } catch (Exception e) {
-                    throw new BeanException("invoke inject-methods method failed,because ?", e.getMessage());
+                    throw new BeanException("invoke inject-methods method failed,because ?", e);
                 }
             }
         }

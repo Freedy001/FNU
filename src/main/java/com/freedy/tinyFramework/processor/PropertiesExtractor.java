@@ -4,6 +4,7 @@ import com.freedy.Context;
 import com.freedy.tinyFramework.annotation.beanContainer.Inject;
 import com.freedy.tinyFramework.annotation.prop.Node;
 import com.freedy.tinyFramework.annotation.prop.NoneForce;
+import com.freedy.tinyFramework.annotation.prop.Skip;
 import com.freedy.tinyFramework.exception.BeanException;
 import com.freedy.tinyFramework.exception.BeanInitException;
 import com.freedy.tinyFramework.exception.InjectException;
@@ -30,6 +31,7 @@ public class PropertiesExtractor {
 
     private final Map<String, String> properties;
     private final String propertyPath;
+    private final ThreadLocal<Integer> listModeIndexThreadLocal = new ThreadLocal<>();
 
     public PropertiesExtractor() {
         Properties properties = new Properties();
@@ -51,27 +53,33 @@ public class PropertiesExtractor {
         }
     }
 
+    public boolean injectProperties(String prefix, Object bean) {
+        return injectProperties(prefix, bean, true, false);
+    }
+
     /**
      * 对bean进行属性注入
      *
-     * @param prefix 属性前缀
-     * @param bean   bean对象
-     * @param force  严格模式
+     * @param prefix   属性前缀
+     * @param bean     bean对象
+     * @param force    严格模式
+     * @param listMode bean是不是在集合中
      */
-    public void injectProperties(String prefix, Object bean, boolean force) {
+    public boolean injectProperties(String prefix, Object bean, boolean force, boolean listMode) {
         Class<?> beanClass = bean.getClass();
         NoneForce noneForce = beanClass.getAnnotation(NoneForce.class);
         boolean hasSet = false;
         for (Field field : beanClass.getDeclaredFields()) {
-            if (field.getAnnotation(Inject.class) == null) {
+            if (field.getAnnotation(Inject.class) == null && field.getAnnotation(Skip.class) == null) {
                 String fieldName = field.getName();
                 String propName = prefix + "." + StringUtils.convertConstantFieldToEntityField(fieldName);
-                hasSet = hasSet || injectValue(bean, field, propName, force && noneForce == null);
+                hasSet = injectValue(bean, field, propName, force && noneForce == null, listMode) || hasSet;
             }
         }
         if (hasSet) {
-            log.debug("inject prop on {} succeed!", beanClass.getName());
+            log.debug("inject prop on {} succeed!",listMode?"collection ":beanClass.getName());
         }
+        return hasSet;
     }
 
     /**
@@ -83,7 +91,7 @@ public class PropertiesExtractor {
      * @param force    严格模式
      * @return true注入成功 false表示注入失败
      */
-    private boolean injectValue(Object bean, Field field, String propName, boolean force) {
+    private boolean injectValue(Object bean, Field field, String propName, boolean force, boolean listMode) {
         Class<?> type = field.getType();
 
         String propVal = properties.get(propName);
@@ -110,7 +118,7 @@ public class PropertiesExtractor {
                         properties.forEach((key, v) -> {
                             if (key.startsWith(propName)) {
                                 String mapKey = key.substring(propName.length() + 1);
-                                map.put(ReflectionUtils.convertType(mapKey, _1stType[0]), ReflectionUtils.convertType(v, _2ndType[0]));
+                                map.put(ReflectionUtils.convertType(mapKey, _1stType[0]), ReflectionUtils.convertType(listMode ? getLMVal(v) : v, _2ndType[0]));
                             }
                         });
                     } else {
@@ -119,14 +127,14 @@ public class PropertiesExtractor {
                         properties.forEach((key, v) -> {
                             if (key.startsWith(propName)) {
                                 String mapKey = key.substring(propName.length() + 1);
-                                map.put(mapKey, v);
+                                map.put(mapKey, listMode ? getLMVal(v) : v);
                             }
                         });
                     }
-                    if (map.isEmpty()) {
+                    if (map.isEmpty() && !listMode) {
                         NoneForce noneForce = field.getAnnotation(NoneForce.class);
                         if (noneForce != null) {
-                            Node[] value = noneForce.mapTypeValIfNone();
+                            Node[] value = noneForce.defaultMapVal();
                             if (_1stType[0] != null && _2ndType[0] != null) {
                                 for (Node node : value) {
                                     map.put(ReflectionUtils.convertType(node.key(), _1stType[0]), ReflectionUtils.convertType(node.val(), _2ndType[0]));
@@ -146,23 +154,42 @@ public class PropertiesExtractor {
                         fieldVal = map;
                     }
                 } else if (ReflectionUtils.isSonInterface(type, "java.util.Collection")) {
-                    fieldVal = injectCollectionTypeVal(bean, field, propName, null, force);
-                } else if (ReflectionUtils.isBasicType(type)) {
-                    NoneForce noneForce = field.getAnnotation(NoneForce.class);
-                    if (noneForce != null) {
-                        String value = noneForce.normalTypeValIfNone();
-                        fieldVal = StringUtils.hasText(value) ? ReflectionUtils.convertType(value, type) : null;
-                    } else if (force) {
-                        //基本类型取值为空抛异常
-                        throw new InjectException("could not find a suitable property for bean[className:?]'s filed[filedName:?,PropName:?] in properties file[path:?]", bean.getClass().getName(), field.getName(), propName, propertyPath);
-                    } else {
+                    if (listMode)
+                        throw new BeanInitException("The field of an object[type:?] in a collection (which in prop name is ?) cannot be of ? type", bean.getClass(), propName, type.getName());
+                    createCollection:
+                    {
+                        if (field.getGenericType() instanceof ParameterizedType parameterizedType) {
+                            //生成list泛型为对象时的list对象
+                            Type[] genericType = parameterizedType.getActualTypeArguments();
+                            Class<?> listType = (Class<?>) genericType[0];
+                            Class<?> rawType = (Class<?>) parameterizedType.getRawType();
+                            if (!ReflectionUtils.isBasicType(listType)) {
+                                NoneForce noneForce = field.getAnnotation(NoneForce.class);
+                                Collection<Object> listContainer = ReflectionUtils.buildCollectionByType(rawType);
+
+                                Object filedObj = listType.getConstructor().newInstance();
+                                while (injectProperties(propName, filedObj, force && noneForce == null, true)) {
+                                    listContainer.add(filedObj);
+                                    filedObj = listType.getConstructor().newInstance();
+                                    addIndex();
+                                }
+                                clearIndex();
+
+                                fieldVal = listContainer;
+                                break createCollection;
+                            }
+                        }
+                        checkForce(bean, field, propName, force);
                         fieldVal = null;
                     }
+                } else if (ReflectionUtils.isBasicType(type) || type.isArray()) {
+                    checkForce(bean, field, propName, force);
+                    fieldVal = null;
                 } else {
                     // 普通obj类型
                     NoneForce noneForce = field.getAnnotation(NoneForce.class);
                     Object filedObj = type.getConstructor().newInstance();
-                    injectProperties(propName, filedObj, force && noneForce == null);
+                    injectProperties(propName, filedObj, force && noneForce == null, false);
                     fieldVal = filedObj;
                 }
             } catch (BeanException e) {
@@ -173,11 +200,42 @@ public class PropertiesExtractor {
         } else {  //list 或 基本类型
             if (ReflectionUtils.isBasicType(type)) {
                 //普通类型
-                fieldVal = ReflectionUtils.convertType(propVal, type);
+                if (listMode) {
+                    String lmVal = getLMVal(propVal);
+                    if (lmVal == null) {
+                        checkForce(bean, field, propName, force);
+                    }
+                    fieldVal = ReflectionUtils.convertType(lmVal, type);
+                } else {
+                    fieldVal = ReflectionUtils.convertType(propVal, type);
+                }
             } else {
                 //Collection类型
                 if (ReflectionUtils.isSonInterface(type, "java.util.Collection")) {
-                    fieldVal = injectCollectionTypeVal(bean, field, propName, propVal, force);
+                    if (listMode) {
+                        String lmVal = getLMVal(propVal);
+                        if (lmVal == null) {
+                            checkForce(bean, field, propName, force);
+                            fieldVal = ReflectionUtils.buildCollectionByFiledAndValue(field, null);
+                        } else {
+                            fieldVal = ReflectionUtils.buildCollectionByFiledAndValue(field, lmVal.split("\\|"));
+                        }
+                    } else {
+                        fieldVal = ReflectionUtils.buildCollectionByFiledAndValue(field, propVal.split(","));
+                    }
+                } else if (type.isArray()) {
+                    //arr类型
+                    if (listMode) {
+                        String lmVal = getLMVal(propVal);
+                        if (lmVal == null) {
+                            checkForce(bean, field, propName, force);
+                            fieldVal = ReflectionUtils.buildArrByArrFieldAndVal(type, null);
+                        } else {
+                            fieldVal = ReflectionUtils.buildArrByArrFieldAndVal(type, lmVal.split("\\|"));
+                        }
+                    } else {
+                        fieldVal = ReflectionUtils.buildArrByArrFieldAndVal(type, propVal.split(","));
+                    }
                 } else {
                     throw new BeanInitException("not supported type:?", type.getName());
                 }
@@ -190,6 +248,9 @@ public class PropertiesExtractor {
                 field.setAccessible(true);
                 field.set(bean, fieldVal);
                 return true;
+            } else {
+                if (!listMode)
+                log.warn("could not find a suitable property for bean[className:{}]'s filed[filedName:{},PropName:{}] in properties file[path:{}]", bean.getClass().getName(), field.getName(), propName, propertyPath);
             }
         } catch (Exception e) {
             throw new BeanInitException("set value failed,because ?", e);
@@ -197,31 +258,41 @@ public class PropertiesExtractor {
         return false;
     }
 
-    private Object injectCollectionTypeVal(Object bean, Field field, String propName, String propVal, boolean force) {
-        Object fieldVal;
-        try {
-            Collection<Object> collection = ReflectionUtils.buildCollectionByFiledAndValue(field, propVal == null ? null : propVal.split(","));
-
-            if (collection.isEmpty()) {
-                NoneForce noneForce = field.getAnnotation(NoneForce.class);
-                if (noneForce != null) {
-                    String value = noneForce.normalTypeValIfNone();
-                    if (StringUtils.hasText(value))
-                        collection.addAll(Arrays.asList(value.split(",")));
-                    else
-                        collection = null;
-                } else if (force) {
-                    throw new InjectException("could not find a suitable property for bean[className:?]'s filed[filedName:?,PropName:?] in properties file[path:?]", bean.getClass().getName(), field.getName(), propName, propertyPath);
-                } else {
-                    collection = null;
-                }
-            }
-            fieldVal = collection;
-        } catch (Throwable ex) {
-            throw new BeanInitException("can not create bean[name:?]'s field[name:?,type:?],because ?", bean.getClass().getName(), field.getName(), field.getType().getName(), ex);
+    /**
+     * 如果从properties中获取的值为空则需要调用此方法来检测是否需要强制抛异常
+     */
+    private void checkForce(Object bean, Field field, String propName, boolean force) {
+        NoneForce noneForce = field.getAnnotation(NoneForce.class);
+        if (noneForce == null && force) {
+            //基本类型取值为空抛异常
+            throw new InjectException("could not find a suitable property for bean[className:?]'s filed[filedName:?,PropName:?] in properties file[path:?]", bean.getClass().getName(), field.getName(), propName, propertyPath);
         }
-        return fieldVal;
     }
 
+
+    private String getLMVal(String val) {
+        String[] split = val.split(",");
+        Integer index = listModeIndexThreadLocal.get();
+        if (index == null) {
+            listModeIndexThreadLocal.set(0);
+            index = 0;
+        }
+        if (index < split.length) {
+            return split[index];
+        }
+        return null;
+    }
+
+    private void addIndex() {
+        Integer index = listModeIndexThreadLocal.get();
+        if (index == null) {
+            throw new IllegalArgumentException("you should call getIndex() method first!");
+        }
+        listModeIndexThreadLocal.set(index + 1);
+    }
+
+    private void clearIndex() {
+        listModeIndexThreadLocal.remove();
+    }
 
 }

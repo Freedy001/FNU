@@ -27,7 +27,13 @@ public abstract class BeanDefinition {
         this.beanClass = beanClass;
     }
 
+    public void setPostConstruct(Method postConstruct){
+        postConstruct.setAccessible(true);
+        this.postConstruct=postConstruct;
+    }
+
     public void addInjectMethods(Method injectMethod){
+        injectMethod.setAccessible(true);
         if (injectMethods==null){
             injectMethods=new ArrayList<>();
         }

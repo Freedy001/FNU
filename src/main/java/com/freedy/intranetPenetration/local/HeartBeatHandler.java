@@ -2,6 +2,9 @@ package com.freedy.intranetPenetration.local;
 
 import com.freedy.Context;
 import com.freedy.Struct;
+import com.freedy.tinyFramework.annotation.beanContainer.BeanType;
+import com.freedy.tinyFramework.annotation.beanContainer.Inject;
+import com.freedy.tinyFramework.annotation.beanContainer.Part;
 import com.freedy.utils.ChannelUtils;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
@@ -10,6 +13,9 @@ import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.List;
+import java.util.Map;
+
 /**
  * 处理服务端心跳相应
  *
@@ -17,10 +23,12 @@ import lombok.extern.slf4j.Slf4j;
  * @date 2021/11/18 16:14
  */
 @Slf4j
+@Part(value = "localHeartBeatHandler",type = BeanType.PROTOTYPE)
 public class HeartBeatHandler extends ChannelInboundHandlerAdapter {
 
     private int readIdleTimes = 0;
-
+    @Inject("remoteChannelMap")
+    private Map<Struct.ConfigGroup, List<Channel>> remoteChannelMap;
 
     @Override
     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) {
@@ -52,7 +60,7 @@ public class HeartBeatHandler extends ChannelInboundHandlerAdapter {
         Channel channel = ctx.channel();
         log.info("[INTRANET-LOCAL-SERVER]: 关闭管道{}", channel.toString());
         Struct.ConfigGroup group = ChannelUtils.getGroup(channel);
-        ClientConnector.remoteChannelMap.get(group).remove(channel);
+        remoteChannelMap.get(group).remove(channel);
         channel.close();
     }
 

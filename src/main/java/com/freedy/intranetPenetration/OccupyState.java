@@ -1,8 +1,8 @@
 package com.freedy.intranetPenetration;
 
 import com.freedy.Struct;
-import com.freedy.intranetPenetration.remote.ChanelWarehouse;
 import com.freedy.loadBalancing.LoadBalance;
+import com.freedy.tinyFramework.beanFactory.BeanFactory;
 import com.freedy.utils.ChannelUtils;
 import io.netty.channel.Channel;
 import lombok.Getter;
@@ -40,6 +40,8 @@ public class OccupyState {
     private static final Map<Integer, Boolean> checkShrink = new ConcurrentHashMap<>();
     private static final Map<Integer, Struct.BoolWithStamp> checkExpandMap = new ConcurrentHashMap<>();
 
+    private static Map<Integer, LoadBalance<Channel>> portChannelCache;
+
     public static void initTaskQueue(int serverPort) {
         lastReleaseTimeMap.put(serverPort, new long[]{System.currentTimeMillis()});
         wakeupMap.put(serverPort, new ConcurrentLinkedQueue<>());
@@ -55,7 +57,7 @@ public class OccupyState {
     }
 
     public static void inspectChannelState() {
-        ChanelWarehouse.PORT_CHANNEL_CACHE.forEach((k, v) -> {
+        portChannelCache.forEach((k, v) -> {
             int busy = getBusyChannelCount(v);
             try {
                 int channelSize = v.size();
@@ -100,13 +102,15 @@ public class OccupyState {
     private final long[] lastReleaseTime;
     private final Struct.BoolWithStamp checkExpand;
 
-    public OccupyState(Channel intranetChannel, int serverPort) {
+    @SuppressWarnings("unchecked")
+    public OccupyState(Channel intranetChannel, int serverPort, BeanFactory factory) {
         this.intranetChannel = intranetChannel;
         this.serverPort = serverPort;
         this.lastReleaseTime = lastReleaseTimeMap.get(serverPort);
         this.taskQueue = wakeupMap.get(serverPort);
         this.shrinkCount = shrinkCountMap.get(serverPort);
         this.checkExpand = checkExpandMap.get(serverPort);
+        portChannelCache = (Map<Integer, LoadBalance<Channel>>) factory.getBean("portChannelCache", Map.class);
     }
 
     /**
@@ -197,9 +201,9 @@ public class OccupyState {
     }
 
     private void shrinkTask() {
-        LoadBalance<Channel> loadBalance = ChanelWarehouse.PORT_CHANNEL_CACHE.get(serverPort);
+        LoadBalance<Channel> loadBalance = portChannelCache.get(serverPort);
         int busyCount = getBusyChannelCount(loadBalance);
-        //预留1/4的管道缓存空间
+        //预留1/2的管道缓存空间
         if (loadBalance.size() > busyCount + (busyCount >> 1)) {
             //shrink
             shrinkCount.incrementAndGet();
@@ -213,15 +217,18 @@ public class OccupyState {
         if (shrinkCount.get() >= 5) {
             lockShrinkCheck();
             intranetChannel.eventLoop().schedule(() -> {
-                int bCount = getBusyChannelCount(loadBalance);
-                //预留1/4的管道缓存空间
-                int shrink = loadBalance.size() - (bCount + (bCount >> 1));
-                if (shrink < 0) {
-                    log.info("ready to send shrink command to client,shrink count:{}", shrink);
-                    ChannelUtils.setCmd(intranetChannel, Protocol.SHRINK.param(shrink));
+                try {
+                    int bCount = getBusyChannelCount(loadBalance);
+                    //预留1/4的管道缓存空间
+                    int shrink = loadBalance.size() - (bCount + (bCount >> 1));
+                    if (shrink > 0) {
+                        log.info("ready to send shrink command to client,shrink count:{}", shrink);
+                        ChannelUtils.setCmd(intranetChannel, Protocol.SHRINK.param(shrink));
+                    }
+                    shrinkCount.set(0);
+                } finally {
+                    unlockShrinkCheck();
                 }
-                shrinkCount.set(0);
-                unlockShrinkCheck();
             }, 30, TimeUnit.SECONDS);
         }
     }

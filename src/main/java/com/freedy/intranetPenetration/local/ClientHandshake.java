@@ -3,6 +3,7 @@ package com.freedy.intranetPenetration.local;
 import com.freedy.Context;
 import com.freedy.Struct;
 import com.freedy.intranetPenetration.Protocol;
+import com.freedy.tinyFramework.beanFactory.BeanFactory;
 import com.freedy.utils.ChannelUtils;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
@@ -38,13 +39,16 @@ public class ClientHandshake extends SimpleChannelInboundHandler<String> {
     private final Struct.ConfigGroup group;
     private boolean isFirst = true;
 
-    public ClientHandshake(Struct.ConfigGroup group) {
+    private final BeanFactory factory;
+
+    public ClientHandshake(Struct.ConfigGroup group,BeanFactory factory) {
         this.group = group;
+        this.factory=factory;
     }
 
 
     @Override
-    protected void channelRead0(ChannelHandlerContext ctx, String msg) throws Exception {
+    protected void channelRead0(ChannelHandlerContext ctx, String msg) {
         if (msg.startsWith(Protocol.ACK)) {
             log.debug("[client]接收ACK");
             Channel channel = ctx.channel();
@@ -58,8 +62,8 @@ public class ClientHandshake extends SimpleChannelInboundHandler<String> {
                 channel.pipeline().remove(ObjectDecoder.class);
                 channel.pipeline().remove(ClientHandshake.class);
                 channel.pipeline().addLast(
-                        new HeartBeatHandler(),
-                        new RequestListener()
+                        factory.getBean(HeartBeatHandler.class),
+                        factory.getBean(RequestListener.class)
                 );
                 channel.pipeline().addFirst(
                         new IdleStateHandler(Context.INTRANET_READER_IDLE_TIME, 0, 0, TimeUnit.SECONDS)

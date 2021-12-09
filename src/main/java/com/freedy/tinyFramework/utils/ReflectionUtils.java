@@ -448,5 +448,21 @@ public class ReflectionUtils {
         return map;
     }
 
+    /**
+     * 从arrClass和val字符串中构建数组
+     */
+    public static Object buildArrByArrFieldAndVal(Class<?> type, String[] valArr) {
+        if (!type.isArray() || valArr == null) return null;
+        Object fieldVal;
+        Class<?> arrayType = type.getComponentType();
+        int arrLen = valArr.length;
+        Object newArray = Array.newInstance(arrayType, arrLen);
+        for (int i = 0; i < arrLen; i++) {
+            Array.set(newArray, i, ReflectionUtils.convertType(valArr[i], arrayType));
+        }
+        fieldVal = newArray;
+        return fieldVal;
+    }
+
 }
 

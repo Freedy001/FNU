@@ -1,6 +1,8 @@
 package com.freedy.intranetPenetration.remote;
 
 import com.freedy.intranetPenetration.OccupyState;
+import com.freedy.tinyFramework.annotation.beanContainer.BeanType;
+import com.freedy.tinyFramework.annotation.beanContainer.Part;
 import com.freedy.utils.ChannelUtils;
 import com.freedy.utils.ReleaseUtil;
 import io.netty.channel.Channel;
@@ -14,6 +16,7 @@ import lombok.extern.slf4j.Slf4j;
  * @date 2021/11/17 17:01
  */
 @Slf4j
+@Part(type = BeanType.PROTOTYPE)
 public class ResponseListener extends ChannelInboundHandlerAdapter {
 
 

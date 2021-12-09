@@ -1,12 +1,14 @@
 package com.freedy.manage.controller;
 
 import com.freedy.Context;
-import com.freedy.Start;
+import com.freedy.ServerStarter;
 import com.freedy.log.LogRecorder;
 import com.freedy.manage.Response;
 import com.freedy.manage.entity.IntranetLocalEntity;
+import com.freedy.tinyFramework.annotation.beanContainer.Inject;
 import com.freedy.tinyFramework.annotation.mvc.Get;
 import com.freedy.tinyFramework.annotation.mvc.REST;
+import com.freedy.tinyFramework.beanFactory.BeanFactory;
 
 import java.lang.reflect.Field;
 
@@ -20,12 +22,19 @@ import static com.freedy.tinyFramework.utils.StringUtils.convertEntityFieldToCon
 public class ManagerController {
     private final Class<Context> contextClass = Context.class;
 
+    @Inject
+    private BeanFactory beanFactory;
+
+    @Inject
+    private ServerStarter serverStarter;
+
     @Get
-    public Response intranetLocal(Start.InfoMap infoMap) {
+    public Response intranetLocal() {
         IntranetLocalEntity local = new IntranetLocalEntity();
-        Start.StartInfo channelInfo = infoMap.get("INTRANET_LOCAL_SERVER");
-        local.setIsLocalStart(channelInfo!=null);
-        local.setStartTime(channelInfo!=null?channelInfo.startTime():-1);
+        boolean isStart = beanFactory.containsBean("intranetLocalServer");
+
+        local.setIsLocalStart(isStart);
+        local.setStartTime(isStart ? serverStarter.getIntranetLocalStartTime() : null);
         for (Field field : IntranetLocalEntity.class.getDeclaredFields()) {
             try {
                 String s = convertEntityFieldToConstantField(field.getName());

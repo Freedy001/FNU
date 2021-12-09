@@ -3,6 +3,9 @@ package com.freedy.intranetPenetration.remote;
 import com.freedy.Context;
 import com.freedy.intranetPenetration.Protocol;
 import com.freedy.loadBalancing.LoadBalance;
+import com.freedy.tinyFramework.annotation.beanContainer.BeanType;
+import com.freedy.tinyFramework.annotation.beanContainer.Inject;
+import com.freedy.tinyFramework.annotation.beanContainer.Part;
 import com.freedy.utils.ChannelUtils;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
@@ -12,6 +15,7 @@ import io.netty.handler.timeout.IdleStateEvent;
 import lombok.extern.slf4j.Slf4j;
 
 import java.net.ConnectException;
+import java.util.Map;
 
 /**
  * 处理客户端心跳
@@ -20,10 +24,13 @@ import java.net.ConnectException;
  * @date 2021/11/18 16:14
  */
 @Slf4j
+@Part(value = "remoteHeartBeatHandler",type = BeanType.PROTOTYPE)
 public class HeartBeatHandler extends ChannelInboundHandlerAdapter {
 
-    int readIdleTimes = 0;
+    private int readIdleTimes = 0;
 
+    @Inject("portChannelCache")
+    private Map<Integer, LoadBalance<Channel>> portChannelCache;
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) {
@@ -63,7 +70,7 @@ public class HeartBeatHandler extends ChannelInboundHandlerAdapter {
     private void requireNewChannelAndDeleteOld(ChannelHandlerContext ctx) {
         Channel localChannel = ctx.channel();
         int port = ChannelUtils.getGroup(localChannel).getRemoteServerPort();
-        LoadBalance<Channel> balance = ChanelWarehouse.PORT_CHANNEL_CACHE.get(port);
+        LoadBalance<Channel> balance = portChannelCache.get(port);
         balance.removeElement(localChannel);
         localChannel.close();
         log.info("[INTRANET-REMOTE-SERVER]: 关闭管道({})", localChannel);

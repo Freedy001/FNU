@@ -5,12 +5,15 @@ import com.freedy.AuthenticAndEncrypt;
 import com.freedy.Context;
 import com.freedy.Struct;
 import com.freedy.errorProcessor.ErrorHandler;
+import com.freedy.jumpProxy.ReverseProxyProp;
 import com.freedy.loadBalancing.LoadBalance;
+import com.freedy.tinyFramework.annotation.beanContainer.BeanType;
+import com.freedy.tinyFramework.annotation.beanContainer.Inject;
+import com.freedy.tinyFramework.annotation.beanContainer.Part;
 import com.freedy.utils.ReleaseUtil;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.*;
-import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.LengthFieldPrepender;
 import io.netty.handler.codec.http.*;
@@ -28,53 +31,55 @@ import java.util.regex.Pattern;
  * @author Freedy
  * @date 2021/11/8 10:16
  */
+@Part(type = BeanType.PROTOTYPE)
 @Slf4j
 public class MsgForward extends ChannelInboundHandlerAdapter {
 
-    private final Bootstrap bootstrap = new Bootstrap();
     private ChannelFuture connectFuture;
 
+    @Inject
+    private Bootstrap bootstrap;
+
     private final LoadBalance<Struct.IpAddress> lb;
-    private final boolean isProxy;
     private final int port;
-    private String remoteAddress;
-    private int remotePort;
+    private final boolean jumpEndPoint;
     private final byte[] pacData;
 
-    public MsgForward(LoadBalance<Struct.IpAddress> lb, boolean isProxy, int port, byte[] pacData) {
-        this.lb = lb;
-        this.isProxy = isProxy;
-        this.port = port;
+
+    private String remoteAddress;
+    private int remotePort;
+
+    public MsgForward(ReverseProxyProp proxyProp, @Inject("pac") byte[] pacData) {
+        this.lb = proxyProp.getReverseProxyLB();
+        this.port = proxyProp.getPort();
+        this.jumpEndPoint = proxyProp.isJumpEndPoint();
         this.pacData = pacData;
     }
+
 
     @Override
     public void channelActive(ChannelHandlerContext ctx) {
         Channel localChannel = ctx.channel();
-        bootstrap.group(localChannel.eventLoop())
-                .channel(NioSocketChannel.class)
-                .handler(new ChannelInitializer<>() {
-                    @Override
-                    protected void initChannel(Channel channel) {
-                        if (isProxy) {
-                            channel.pipeline().addLast(new LocalMsgForward(localChannel, port));
-                        } else {
-                            channel.pipeline().addLast(
-                                    new LengthFieldBasedFrameDecoder(Integer.MAX_VALUE, 0, 4, 0, 4),
-                                    new LengthFieldPrepender(4),
-                                    new AuthenticAndEncrypt(),
-                                    new AuthenticAndDecrypt(null),
-                                    new LocalMsgForward(localChannel, port)
-                            );
-                        }
-                    }
-                });
         //负载均衡
         Struct.IpAddress address = lb.getElement();
         remoteAddress = address.address();
         remotePort = address.port();
         lb.setAttributes(localChannel);
         connectFuture = bootstrap.connect(remoteAddress, remotePort);
+        connectFuture.addListener(future -> {
+            Channel channel = connectFuture.channel();
+            if (jumpEndPoint) {
+                channel.pipeline().addLast(
+                        new LengthFieldBasedFrameDecoder(Integer.MAX_VALUE, 0, 4, 0, 4),
+                        new LengthFieldPrepender(4),
+                        new AuthenticAndEncrypt(),
+                        new AuthenticAndDecrypt(null),
+                        new LocalMsgForward(localChannel, port)
+                );
+            } else {
+                channel.pipeline().addLast(new LocalMsgForward(localChannel, port));
+            }
+        });
     }
 
     @Override
@@ -87,14 +92,13 @@ public class MsgForward extends ChannelInboundHandlerAdapter {
             packInfo = byteBuf.toString(Charset.defaultCharset());
         }
         //日志输出
-        if (isProxy) {
-            log.info("[REVERSE-PROXY]: redirect {} to {}", localChannel.remoteAddress().toString().substring(1), remoteAddress + ":" + remotePort);
-        } else {
+        if (jumpEndPoint) {
             if (packInfo != null) {
                 Matcher matcher = Pattern.compile("(.*?) (.*?)HTTP/(.|" + Context.LF + ")*?(Host|host): (.*?)" + Context.LF + ".*").matcher(packInfo);
                 if (matcher.find()) {
                     //如果是http请求
-                    if (matcher.group(5).equals("127.0.0.1:8900")) {
+                    String host = matcher.group(5);
+                    if (host.equals("127.0.0.1:"+port)||host.equals("localhost:"+port)) {
                         ctx.channel().pipeline().addLast(new HttpResponseEncoder());
                         String url = matcher.group(2).trim();
                         if (!url.equals("/pac")) {
@@ -109,7 +113,7 @@ public class MsgForward extends ChannelInboundHandlerAdapter {
                             ctx.channel().writeAndFlush(response).addListener(ChannelFutureListener.CLOSE);
                             return;
                         }
-                        log.info("{} request pac",localChannel.remoteAddress().toString().substring(1));
+                        log.info("{} request pac", localChannel.remoteAddress().toString().substring(1));
                         DefaultFullHttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
                         response.headers().set(HttpHeaderNames.CONTENT_TYPE, "application/x-ns-proxy-autoconfig");
                         response.headers().set(HttpHeaderNames.CONTENT_LENGTH, pacData.length);
@@ -117,14 +121,16 @@ public class MsgForward extends ChannelInboundHandlerAdapter {
                         ctx.channel().writeAndFlush(response).addListener(ChannelFutureListener.CLOSE);
                         return;
                     }
-                    log.info("[PROXY-HTTP-{}]: {} send msg to {}", matcher.group(1), localChannel.remoteAddress().toString().substring(1), matcher.group(5));
+                    log.info("[PROXY-HTTP-{}]: {} send msg to {}", matcher.group(1), localChannel.remoteAddress().toString().substring(1), host);
                 }
             }
+        } else {
+            log.info("[REVERSE-PROXY]: redirect {} to {}", localChannel.remoteAddress().toString().substring(1), remoteAddress + ":" + remotePort);
         }
 
         connectFuture.addListener(future -> {
             if (!future.isSuccess()) {
-                ErrorHandler.handle(ctx,msg);
+                ErrorHandler.handle(ctx, msg);
                 return;
             }
             Channel remoteChannel = connectFuture.channel();

@@ -15,6 +15,8 @@ public @interface Bean {
 
     BeanType type() default BeanType.SINGLETON;
 
+    String conditionalOnExpression() default "";
+
     Class<?> conditionalOnMissBeanByTyp() default Bean.class;
     String conditionalOnMissBeanByName() default "";
     Class<?> conditionalOnBeanByType() default Bean.class;

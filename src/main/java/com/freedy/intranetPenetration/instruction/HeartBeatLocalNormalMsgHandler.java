@@ -3,6 +3,7 @@ package com.freedy.intranetPenetration.instruction;
 import com.freedy.intranetPenetration.ForwardTask;
 import com.freedy.intranetPenetration.OccupyState;
 import com.freedy.intranetPenetration.Protocol;
+import com.freedy.tinyFramework.annotation.beanContainer.Part;
 import com.freedy.utils.ChannelUtils;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
@@ -13,6 +14,7 @@ import java.util.Queue;
  * @author Freedy
  * @date 2021/11/23 19:48
  */
+@Part
 public class HeartBeatLocalNormalMsgHandler implements InstructionHandler {
 
     @Override

@@ -125,7 +125,6 @@ public class Application extends AbstractApplication {
         }
     }
 
-
     @Override
     protected void beanDefinitionPostProcess(BeanDefinition beanTypeDefinition) {
 

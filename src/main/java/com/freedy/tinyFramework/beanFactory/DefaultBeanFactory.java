@@ -8,7 +8,9 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Consumer;
+import java.util.function.BiConsumer;
+
+import static ch.qos.logback.core.pattern.color.ANSIConstants.*;
 
 /**
  * 默认bean工厂 持有bean的容器
@@ -19,9 +21,14 @@ import java.util.function.Consumer;
 @Slf4j
 public abstract class DefaultBeanFactory implements BeanFactory {
 
+    {
+        printBanner("2.0.0");
+    }
+
     private final Map<String, Object> singletonObject = new ConcurrentHashMap<>();
     private final Map<Class<?>, String> typeSingletonObject = new ConcurrentHashMap<>();
-    private final List<Consumer<BeanFactory>> notifyList=new ArrayList<>();
+    private final List<BiConsumer<BeanFactory, String>> notifyList = new ArrayList<>();
+
 
     protected void registerBean(String beanName, Object bean) {
         if (bean instanceof ProxyProcessor.ProxyMataInfo mataInfo) {
@@ -36,26 +43,28 @@ public abstract class DefaultBeanFactory implements BeanFactory {
         Object containerBean = singletonObject.put(beanName, bean);
         log.debug("register bean name:{},type:{}", beanName, bean.getClass().getName());
         if (containerBean != null)
-            throw new NoUniqueBeanException("same bean name!your bean " + bean + " container bean " + containerBean);
+            throw new NoUniqueBeanException("same bean name! your bean:? container bean:? ", bean, containerBean);
         putInterfaceAndSuperclass(beanName, bean);
-        notifyList.forEach(item->item.accept(this));
+        notifyList.forEach(item -> item.accept(this, beanName));
     }
 
-    public void registerBeanAddNotifier(Consumer<BeanFactory> notifier){
+    public void registerBeanAddNotifier(BiConsumer<BeanFactory, String> notifier) {
         notifyList.add(notifier);
     }
 
 
     private void putInterfaceAndSuperclass(String beanName, Object originObj) {
-        for (Class<?> sClass : ReflectionUtils.getClassRecursion(originObj)) {
-            if (!sClass.getName().equals("java.lang.Object")) {
+        Set<Class<?>> set = new HashSet<>();
+        for (Class<?> superClass : ReflectionUtils.getClassRecursion(originObj)) {
+            if (!superClass.getName().equals("java.lang.Object")) {
                 //添加所有父类到容器中
-                typeSingletonObject.merge(sClass, beanName, (o, n) -> o + "," + n);
+                typeSingletonObject.merge(superClass, beanName, (o, n) -> o + "," + n);
             }
+            set.addAll(ReflectionUtils.getInterfaceRecursion(superClass));
         }
-        for (Class<?> aClass : ReflectionUtils.getInterfaceRecursion(originObj)) {
+        for (Class<?> interfaceClass : set) {
             //添加所有接口到容器中
-            typeSingletonObject.merge(aClass, beanName, (o, n) -> o + "," + n);
+            typeSingletonObject.merge(interfaceClass, beanName, (o, n) -> o + "," + n);
         }
     }
 
@@ -92,7 +101,7 @@ public abstract class DefaultBeanFactory implements BeanFactory {
     public <T> T getBean(Class<T> beanType) {
         String[] beanNames = Optional.ofNullable(typeSingletonObject.get(beanType)).orElse("").split(",");
         int length = beanNames.length;
-        if (length == 0) return null;
+        if (StringUtils.isEmpty(beanNames[0])) return null;
         if (length > 1) {
             throw new NoUniqueBeanException("find ? bean definition[type:?] in the bean definition container!", length, beanType.getName());
         }
@@ -111,6 +120,20 @@ public abstract class DefaultBeanFactory implements BeanFactory {
         return ts;
     }
 
+    private void printBanner(@SuppressWarnings("SameParameterValue") String version) {
+        System.out.println("""         
+                  ______  ____                          ____             _____ _   _ _   _\s
+                 / / / / |  _ \\ _____      _____ _ __  | __ ) _   _     |  ___| \\ | | | | |
+                / / / /  | |_) / _ \\ \\ /\\ / / _ \\ '__| |  _ \\| | | |    | |_  |  \\| | | | |
+                \\ \\ \\ \\  |  __/ (_) \\ V  V /  __/ |    | |_) | |_| |    |  _| | |\\  | |_| |
+                 \\_\\_\\_\\ |_|   \\___/ \\_/\\_/ \\___|_|    |____/ \\__, |    |_|   |_| \\_|\\___/\s
+                                                              |___/                       \s
+                """
+                + ESC_START + RED_FG + ESC_END +
+                "Author:Freedy Version:" + version + "           GigHub:https://github.com/Freedy001/FNU"
+                + ESC_START + "0;" + DEFAULT_FG + ESC_END
+        );
+    }
 
     @Override
     public Set<String> getAllBeanNames() {

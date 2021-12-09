@@ -1,20 +1,18 @@
 package com.freedy.jumpProxy.remote;
 
-import com.freedy.jumpProxy.EmitPromise;
+import com.freedy.tinyFramework.annotation.beanContainer.BeanType;
+import com.freedy.tinyFramework.annotation.beanContainer.Inject;
+import com.freedy.tinyFramework.annotation.beanContainer.Part;
 import com.freedy.utils.ReleaseUtil;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
-import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.http.*;
-import io.netty.handler.logging.LogLevel;
-import io.netty.handler.logging.LoggingHandler;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.FutureListener;
 import io.netty.util.concurrent.Promise;
 import lombok.extern.slf4j.Slf4j;
 
 import java.net.InetSocketAddress;
-import java.text.SimpleDateFormat;
 
 import static io.netty.handler.codec.http.HttpResponseStatus.INTERNAL_SERVER_ERROR;
 
@@ -24,9 +22,11 @@ import static io.netty.handler.codec.http.HttpResponseStatus.INTERNAL_SERVER_ERR
  * @date 2021/11/9 14:08
  */
 @Slf4j
+@Part(type = BeanType.PROTOTYPE)
 public class HttpProxyHandler extends SimpleChannelInboundHandler<HttpRequest> {
 
-    private final Bootstrap bootstrap = new Bootstrap();
+    @Inject
+    private Bootstrap bootstrap;
     private String host;
     private int port;
     private HttpRequest request;
@@ -41,8 +41,6 @@ public class HttpProxyHandler extends SimpleChannelInboundHandler<HttpRequest> {
         this.request = request;
         initHostAndPort();
 
-        SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss");
-//        System.out.log.println("[PROXY@"+request.method()+"] "+df.format(new Date())+" "+remoteChannel.remoteAddress()+" try to connect "+host + ":" + port);
         log.info("[PROXY-{}]{} try connect to {}", request.method(), remoteChannel.remoteAddress(), host + ":" + port);
         Promise<Channel> promise = ctx.executor().newPromise();
         if (request.method().equals(HttpMethod.CONNECT)) {
@@ -87,19 +85,17 @@ public class HttpProxyHandler extends SimpleChannelInboundHandler<HttpRequest> {
             });
         }
 
-        bootstrap.group(remoteChannel.eventLoop())
-                .channel(NioSocketChannel.class)
-                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10000)
-                .option(ChannelOption.SO_KEEPALIVE, true)
-                .handler(new LoggingHandler(LogLevel.INFO))
-                .handler(new EmitPromise(promise))
-                .connect(host, port).addListener(future -> {
-                    if (!future.isSuccess()) {
-                        responseError(remoteChannel);
-                        ReleaseUtil.closeOnFlush(remoteChannel);
-                    }
-                });
-
+        ChannelFuture channelFuture = bootstrap.connect(host, port);
+        channelFuture.addListener(future -> {
+            if (!future.isSuccess()) {
+                responseError(remoteChannel);
+                ReleaseUtil.closeOnFlush(remoteChannel);
+                log.error("[CONNECT ERROR] cause:{}", future.cause().getMessage());
+                promise.setFailure(future.cause());
+            } else {
+                promise.setSuccess(channelFuture.channel());
+            }
+        });
 
     }
 

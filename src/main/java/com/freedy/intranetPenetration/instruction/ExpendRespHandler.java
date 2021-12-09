@@ -2,13 +2,15 @@ package com.freedy.intranetPenetration.instruction;
 
 import com.freedy.intranetPenetration.ForwardTask;
 import com.freedy.intranetPenetration.OccupyState;
-import com.freedy.intranetPenetration.remote.ChanelWarehouse;
 import com.freedy.loadBalancing.LoadBalance;
+import com.freedy.tinyFramework.annotation.beanContainer.Inject;
+import com.freedy.tinyFramework.annotation.beanContainer.Part;
 import com.freedy.utils.ChannelUtils;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.Map;
 import java.util.Queue;
 
 /**
@@ -16,7 +18,12 @@ import java.util.Queue;
  * @date 2021/11/23 19:58
  */
 @Slf4j
+@Part
 public class ExpendRespHandler implements InstructionHandler {
+
+    @Inject("portChannelCache")
+    private Map<Integer, LoadBalance<Channel>> portChannelCache;
+
     @Override
     public Boolean apply(ChannelHandlerContext ctx, String[] param) {
         OccupyState occupy = ChannelUtils.getOccupy(ctx.channel());
@@ -27,7 +34,7 @@ public class ExpendRespHandler implements InstructionHandler {
             int wakeUpCount = 0;
 
             if (totalTasks > 0) {
-                LoadBalance<Channel> loadBalance = ChanelWarehouse.PORT_CHANNEL_CACHE.get(port);
+                LoadBalance<Channel> loadBalance = portChannelCache.get(port);
                 ForwardTask task = taskQueue.poll();
 
                 for (Channel channel : loadBalance.getAllSafely()) {

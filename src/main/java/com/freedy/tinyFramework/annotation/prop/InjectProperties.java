@@ -99,4 +99,9 @@ public @interface InjectProperties {
      * bean名称
      */
     String beanName() default "";
+
+    /**
+     * 当需要被属性注入的bean没有一条数据被注入时不对该bean放入容器
+     */
+    boolean nonePutIfEmpty() default false;
 }

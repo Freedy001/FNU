@@ -13,8 +13,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Properties;
 
-import static ch.qos.logback.core.pattern.color.ANSIConstants.*;
-
 /**
  * @author Freedy
  * @date 2021/11/8 10:30
@@ -70,19 +68,6 @@ public class Context {
 
 
     static {
-        System.out.println("""         
-                  ______  ____                          ____             _____ _   _ _   _\s
-                 / / / / |  _ \\ _____      _____ _ __  | __ ) _   _     |  ___| \\ | | | | |
-                / / / /  | |_) / _ \\ \\ /\\ / / _ \\ '__| |  _ \\| | | |    | |_  |  \\| | | | |
-                \\ \\ \\ \\  |  __/ (_) \\ V  V /  __/ |    | |_) | |_| |    |  _| | |\\  | |_| |
-                 \\_\\_\\_\\ |_|   \\___/ \\_/\\_/ \\___|_|    |____/ \\__, |    |_|   |_| \\_|\\___/\s
-                                                              |___/                       \s
-                """
-                + ESC_START + RED_FG + ESC_END +
-                "Author:Freedy Version:1.0.0           GigHub:https://github.com/Freedy001/FNU"
-                + ESC_START + "0;" + DEFAULT_FG + ESC_END
-        );
-
         Properties properties = new Properties();
         try {
             File file = new File("./conf.properties");

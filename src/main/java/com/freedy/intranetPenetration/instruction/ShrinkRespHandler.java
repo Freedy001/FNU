@@ -1,7 +1,9 @@
 package com.freedy.intranetPenetration.instruction;
 
 import com.freedy.intranetPenetration.OccupyState;
-import com.freedy.intranetPenetration.remote.ChanelWarehouse;
+import com.freedy.loadBalancing.LoadBalance;
+import com.freedy.tinyFramework.annotation.beanContainer.Inject;
+import com.freedy.tinyFramework.annotation.beanContainer.Part;
 import com.freedy.utils.ChannelUtils;
 import com.freedy.utils.ReleaseUtil;
 import io.netty.channel.Channel;
@@ -9,14 +11,17 @@ import io.netty.channel.ChannelHandlerContext;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * @author Freedy
  * @date 2021/11/24 12:50
  */
+@Part
 @Slf4j
 public class ShrinkRespHandler implements InstructionHandler {
-
+    @Inject("portChannelCache")
+    private Map<Integer, LoadBalance<Channel>> portChannelCache;
 
     @Override
     public Boolean apply(ChannelHandlerContext ctx, String[] params) {
@@ -27,7 +32,7 @@ public class ShrinkRespHandler implements InstructionHandler {
         } else {
             Integer shrinkCount = getIntParam(params[1]);
             if (shrinkCount == null) return true;
-            List<Channel> channelList = ChanelWarehouse.PORT_CHANNEL_CACHE.get(ChannelUtils.getGroup(ctx.channel()).getRemoteServerPort()).getAllSafely();
+            List<Channel> channelList = portChannelCache.get(ChannelUtils.getGroup(ctx.channel()).getRemoteServerPort()).getAllSafely();
             int actual = 0;
             for (Channel channel : channelList) {
                 OccupyState occupy = ChannelUtils.getOccupy(channel);

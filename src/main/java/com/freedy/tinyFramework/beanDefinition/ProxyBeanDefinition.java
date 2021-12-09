@@ -4,6 +4,7 @@ import com.freedy.tinyFramework.exception.IllegalExpressionException;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
+import lombok.ToString;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -17,6 +18,7 @@ import java.util.regex.Pattern;
  * @date 2021/12/7 14:43
  */
 @Data
+@ToString(callSuper = true)
 @EqualsAndHashCode(callSuper = true)
 public class ProxyBeanDefinition extends BeanDefinition {
     private List<MataInterceptor> interceptor = new ArrayList<>();
@@ -42,9 +44,6 @@ public class ProxyBeanDefinition extends BeanDefinition {
         return list;
     }
 
-    public static void main(String[] args) {
-        System.out.println("com.freedy.tinyFramework.processor.ProxyProcessor.get*(int,Method,?,*)".replace(".", "\\.").replace("*", ".*?"));
-    }
 
     @Getter
     public static class MataInterceptor {

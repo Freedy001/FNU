@@ -16,6 +16,7 @@ public class ParentChannelFuture {
     public void setChannel(Channel channel) {
         if (consumer != null) {
             consumer.accept(channel);
+            consumer=null;
         } else {
             this.channel = channel;
         }
@@ -25,6 +26,7 @@ public class ParentChannelFuture {
     public void addListener(Consumer<Channel> consumer) {
         if (channel != null) {
             consumer.accept(channel);
+            channel=null;
         } else {
             this.consumer = consumer;
         }

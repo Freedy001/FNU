@@ -7,9 +7,9 @@ import java.lang.annotation.*;
  * @date 2021/12/2 15:41
  */
 @Documented
-@Target({ElementType.FIELD, ElementType.METHOD})
+@Target({ElementType.FIELD, ElementType.METHOD,ElementType.PARAMETER})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Inject {
-    //仅当标注在Field上才有效
-    String byName() default "";
+    //通过名称注入 不填按照类型注入
+    String value() default "";
 }

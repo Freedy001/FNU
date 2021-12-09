@@ -3,6 +3,11 @@ package com.freedy.intranetPenetration.remote;
 import com.freedy.Context;
 import com.freedy.Struct;
 import com.freedy.intranetPenetration.Protocol;
+import com.freedy.loadBalancing.LoadBalance;
+import com.freedy.tinyFramework.annotation.beanContainer.BeanType;
+import com.freedy.tinyFramework.annotation.beanContainer.Inject;
+import com.freedy.tinyFramework.annotation.beanContainer.Part;
+import com.freedy.tinyFramework.beanFactory.BeanFactory;
 import com.freedy.utils.ChannelUtils;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBufAllocator;
@@ -18,7 +23,6 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.net.SocketAddress;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -26,9 +30,17 @@ import java.util.concurrent.TimeUnit;
  * @date 2021/11/17 17:57
  */
 @Slf4j
+@Part(type = BeanType.PROTOTYPE)
 public class ServerHandshake extends SimpleChannelInboundHandler<String> {
 
-    public final static Map<Integer,Channel> PORT_STARTED=new ConcurrentHashMap<>();
+    @Inject("remoteServerForBrowserParentChannel")
+    private Map<Integer,Channel> remoteServerForBrowserParentChannel;
+    @Inject
+    private NioEventLoopGroup worker;
+    @Inject
+    private BeanFactory factory;
+    @Inject("portChannelCache")
+    private Map<Integer, LoadBalance<Channel>> portChannelCache;
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, String msg) throws Exception {
@@ -46,8 +58,8 @@ public class ServerHandshake extends SimpleChannelInboundHandler<String> {
                         channel.pipeline().remove(ChanelWarehouse.class);
                         channel.pipeline().remove(ServerHandshake.class);
                         channel.pipeline().addLast(
-                                new HeartBeatHandler(),
-                                new ResponseListener()
+                                factory.getBean(HeartBeatHandler.class),
+                                factory.getBean(ResponseListener.class)
                         );
                         channel.pipeline().addFirst(
                                 new IdleStateHandler(Context.INTRANET_READER_IDLE_TIME, 0, 0, TimeUnit.SECONDS)
@@ -58,24 +70,25 @@ public class ServerHandshake extends SimpleChannelInboundHandler<String> {
             }
             Struct.ConfigGroup group = ChannelUtils.getGroup(channel);
             final int remoteServerPort = group.getRemoteServerPort();
-            if (PORT_STARTED.put(remoteServerPort, fakeChannel)==null) {
+            if (remoteServerForBrowserParentChannel.put(remoteServerPort, fakeChannel)==null) {
                 //启动服务
                 ServerBootstrap bootstrap = new ServerBootstrap();
-                Channel parentChannel = bootstrap.group(new NioEventLoopGroup(1),
-                                IntranetServer.workGroup)
+                Channel parentChannel = bootstrap.group(new NioEventLoopGroup(1), worker)
                         .channel(NioServerSocketChannel.class)
                         .option(ChannelOption.SO_BACKLOG, 10240)
                         .childHandler(new ChannelInitializer<>() {
                             @Override
                             protected void initChannel(Channel channel) {
+                                RequestReceiver requestReceiver = factory.getBean(RequestReceiver.class);
+                                requestReceiver.setLb(portChannelCache.get(remoteServerPort));
                                 channel.pipeline().addLast(
-                                        new RequestReceiver(remoteServerPort)
+                                        requestReceiver
                                 );
                             }
                         })
                         .bind(remoteServerPort).sync().channel();
-                PORT_STARTED.put(remoteServerPort, parentChannel);
-                log.warn("Intranet-Slave-Server started success on port:{}", remoteServerPort);
+                remoteServerForBrowserParentChannel.put(remoteServerPort, parentChannel);
+                log.info("Intranet-Remote-Slave-Server started success on http://127.0.0.1:{}/", remoteServerPort);
             }
 
         }

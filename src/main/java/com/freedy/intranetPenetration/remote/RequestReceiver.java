@@ -5,10 +5,13 @@ import com.freedy.errorProcessor.ErrorHandler;
 import com.freedy.intranetPenetration.ForwardTask;
 import com.freedy.intranetPenetration.OccupyState;
 import com.freedy.loadBalancing.LoadBalance;
+import com.freedy.tinyFramework.annotation.beanContainer.BeanType;
+import com.freedy.tinyFramework.annotation.beanContainer.Part;
 import com.freedy.utils.ChannelUtils;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.Map;
@@ -19,20 +22,16 @@ import java.util.concurrent.ConcurrentHashMap;
  * @date 2021/11/17 21:13
  */
 @Slf4j
+@Part(type = BeanType.PROTOTYPE)
 public class RequestReceiver extends ChannelInboundHandlerAdapter {
-
-    private final LoadBalance<Channel> lb;
+    @Setter
+    private LoadBalance<Channel> lb;
     private Channel intranetChannel;
     private int retryCount = 0;
     private int changeTimes = 0;
     public static final Map<Channel, Channel> intranetReceiverMap = new ConcurrentHashMap<>();
     public static final Map<Channel, Channel> receiverIntranetMap = new ConcurrentHashMap<>();
 
-
-
-    public RequestReceiver(int remotePort) {
-        lb = ChanelWarehouse.PORT_CHANNEL_CACHE.get(remotePort);
-    }
 
     @Override
     public void channelActive(ChannelHandlerContext ctx) {
@@ -46,14 +45,14 @@ public class RequestReceiver extends ChannelInboundHandlerAdapter {
     }
 
     @Override
-    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-        if (intranetChannel==null){
-            ErrorHandler.handle(ctx,msg);
+    public void channelRead(ChannelHandlerContext ctx, Object msg) {
+        if (intranetChannel == null) {
+            ErrorHandler.handle(ctx, msg);
             return;
         }
         Channel receiverChannel = ctx.channel();
-        if (intranetChannel.isActive()){
-            retryCount=0; // 重置连接失败次数
+        if (intranetChannel.isActive()) {
+            retryCount = 0; // 重置连接失败次数
 
             OccupyState state = ChannelUtils.getOccupy(intranetChannel);
 
@@ -92,7 +91,7 @@ public class RequestReceiver extends ChannelInboundHandlerAdapter {
 
 
     @Override
-    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+    public void channelInactive(ChannelHandlerContext ctx) {
         if (intranetChannel != null)
             ChannelUtils.getOccupy(intranetChannel).release(ctx.channel());
     }

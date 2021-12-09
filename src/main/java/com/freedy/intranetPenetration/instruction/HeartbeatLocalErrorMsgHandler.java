@@ -1,6 +1,7 @@
 package com.freedy.intranetPenetration.instruction;
 
 import com.freedy.errorProcessor.ErrorHandler;
+import com.freedy.tinyFramework.annotation.beanContainer.Part;
 import com.freedy.utils.ChannelUtils;
 import io.netty.channel.ChannelHandlerContext;
 
@@ -8,6 +9,7 @@ import io.netty.channel.ChannelHandlerContext;
  * @author Freedy
  * @date 2021/11/23 19:58
  */
+@Part
 public class HeartbeatLocalErrorMsgHandler implements InstructionHandler {
     @Override
     public Boolean apply(ChannelHandlerContext ctx, String[] s) {

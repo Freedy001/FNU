@@ -3,6 +3,10 @@ package com.freedy.intranetPenetration;
 import com.freedy.Context;
 import com.freedy.Struct;
 import com.freedy.intranetPenetration.local.ClientConnector;
+import com.freedy.intranetPenetration.local.LocalProp;
+import com.freedy.tinyFramework.annotation.beanContainer.Inject;
+import com.freedy.tinyFramework.annotation.beanContainer.Part;
+import com.freedy.tinyFramework.annotation.beanContainer.PostConstruct;
 import com.freedy.utils.ChannelUtils;
 import io.netty.channel.Channel;
 import lombok.extern.slf4j.Slf4j;
@@ -17,19 +21,34 @@ import java.util.concurrent.Executors;
  * @author Freedy
  * @date 2021/11/18 20:04
  */
+@Part
 @Slf4j
 public class ChannelSentinel extends TimerTask {
 
     private final Map<Struct.ConfigGroup, Integer> groupBadConnectTimes = new HashMap<>();
-    private final ExecutorService executor = Executors.newFixedThreadPool(Context.INTRANET_GROUPS.length);
+    @Inject
+    private ClientConnector clientConnector;
+
+    @Inject("remoteChannelMap")
+    private Map<Struct.ConfigGroup, List<Channel>> remoteChannelMap;
+
+    @Inject
+    private LocalProp prop;
+
+    private ExecutorService executor;
+
+    @PostConstruct
+    private void initExecutor(){
+        executor = Executors.newFixedThreadPool(prop.getConfigGroupList().size());
+    }
 
     @Override
-    @SuppressWarnings({"InfiniteLoopStatement", "BusyWait"})
+    @SuppressWarnings("all")
     public void run() {
         log.info("start channel heartbeat and size check sentinel thread");
         do {
             try {
-                ClientConnector.remoteChannelMap.forEach((group, channelList) -> {
+                remoteChannelMap.forEach((group, channelList) -> {
                     doCheck(group, channelList);
 
                     doHeartbeat(channelList);
@@ -48,7 +67,7 @@ public class ChannelSentinel extends TimerTask {
                 log.warn("bad-connection[{}] has exceed the max bad-connect times[{}]", bConn, Context.INTRANET_MAX_BAD_CONNECT_TIMES);
                 if (size == 0) {
                     //只建立一次试探性连接
-                    if (!ClientConnector.initConnection(group)) {
+                    if (!clientConnector.initConnection(group)) {
                         groupBadConnectTimes.merge(group, 1, Integer::sum);
                         return;  //连接失败 do nothing
                     }
@@ -57,12 +76,12 @@ public class ChannelSentinel extends TimerTask {
                 groupBadConnectTimes.remove(group);
             }
 
-            int expect = Context.INTRANET_CHANNEL_CACHE_MIN_SIZE;
+            int expect = prop.getMinChannelCount();
             if (size < expect) {
                 log.warn("connection[{}] less than expectation[{}],ready to extend connection", size, expect);
                 for (int i = size; i < expect; i++) {
                     //需要重新建立管道连接
-                    if (!ClientConnector.initConnection(group)) {
+                    if (!clientConnector.initConnection(group)) {
                         groupBadConnectTimes.merge(group, 1, Integer::sum);
                     }
                 }

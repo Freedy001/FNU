@@ -1,7 +1,7 @@
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.Socket;
+import com.freedy.tinyFramework.utils.ReflectionUtils;
+
+import java.lang.reflect.Array;
+import java.util.Arrays;
 
 /**
  * @author Freedy
@@ -9,18 +9,21 @@ import java.net.Socket;
  */
 public class Receiver {
 
-    public static void main(String[] args) throws IOException {
-        Socket socket = new Socket("106.14.177.142", 2323);
 
-        InputStream inputStream = socket.getInputStream();
+    int[] a;
 
-        FileOutputStream outputStream = new FileOutputStream("C:\\Users\\Freedy\\Desktop\\code\\netUtils\\src\\test\\test.log");
+    public static void main(String[] args) throws Exception {
+        Class<Integer> integerClass = int.class;
 
-        inputStream.transferTo(outputStream);
+        Object newArray = Array.newInstance(integerClass, 3);
 
-        inputStream.close();
-        outputStream.close();
-        socket.close();
+        Array.set(newArray,0, ReflectionUtils.convertType("523", integerClass));
+        Array.set(newArray,1, ReflectionUtils.convertType("12", integerClass));
+        Array.set(newArray,2, ReflectionUtils.convertType("43", integerClass));
+
+        Receiver scratch = new Receiver();
+        Receiver.class.getDeclaredField("a").set(scratch,newArray);
+        System.out.println(Arrays.toString(scratch.a));
     }
 
 }
