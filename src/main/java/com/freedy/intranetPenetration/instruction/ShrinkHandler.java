@@ -1,8 +1,8 @@
 package com.freedy.intranetPenetration.instruction;
 
-import com.freedy.Context;
 import com.freedy.Struct;
 import com.freedy.intranetPenetration.Protocol;
+import com.freedy.intranetPenetration.local.LocalProp;
 import com.freedy.tinyFramework.annotation.beanContainer.Inject;
 import com.freedy.tinyFramework.annotation.beanContainer.Part;
 import com.freedy.utils.ChannelUtils;
@@ -23,16 +23,20 @@ public class ShrinkHandler implements InstructionHandler {
     @Inject("remoteChannelMap")
     private Map<Struct.ConfigGroup, List<Channel>> remoteChannelMap;
 
+    @Inject
+    private LocalProp prop;
+
     @Override
     public Boolean apply(ChannelHandlerContext ctx, String[] s) {
         Channel channel = ctx.channel();
         int size = remoteChannelMap.get(ChannelUtils.getGroup(channel)).size();
         int shrinkSize = Integer.parseInt(s[0]);
-        if (size - shrinkSize < Context.INTRANET_CHANNEL_CACHE_MIN_SIZE) {
-            shrinkSize = size - Context.INTRANET_CHANNEL_CACHE_MIN_SIZE;
+        int minChannelCount = prop.getMinChannelCount();
+        if (size - shrinkSize < minChannelCount) {
+            shrinkSize = size - minChannelCount;
         }
         if (shrinkSize <= 0) {
-            ChannelUtils.setCmd(channel, Protocol.SHRINK_RESP.param("refused").param(Context.INTRANET_CHANNEL_CACHE_MIN_SIZE));
+            ChannelUtils.setCmd(channel, Protocol.SHRINK_RESP.param("refused").param(minChannelCount));
             return true;
         }
         ChannelUtils.setCmd(channel, Protocol.SHRINK_RESP.param("doShrink").param(shrinkSize));

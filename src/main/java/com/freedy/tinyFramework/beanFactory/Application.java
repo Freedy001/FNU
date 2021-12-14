@@ -41,6 +41,7 @@ public class Application extends AbstractApplication {
 
 
     public Application run() {
+        long startTime = System.currentTimeMillis();
         if (packageName == null && excludePackage == null)
             throw new ApplicationHasStartedException("!!!!!!!!!!!!!!application has started!!!!!!!!!!!!!!");
         scan(packageName, excludePackage);
@@ -57,6 +58,7 @@ public class Application extends AbstractApplication {
         }
         packageName = null;
         excludePackage = null;
+        log.info("application initialization completed in {} ms",System.currentTimeMillis()-startTime);
         return this;
     }
 
@@ -68,7 +70,7 @@ public class Application extends AbstractApplication {
                 .option(ChannelOption.SO_BACKLOG, 10240)
                 .childHandler(new ChannelInitializer<>() {
                     @Override
-                    protected void initChannel(Channel ch) throws Exception {
+                    protected void initChannel(Channel ch) {
                         ch.pipeline().addLast(
                                 new HttpRequestDecoder(),
                                 new HttpResponseEncoder(),

@@ -6,6 +6,7 @@ import com.freedy.tinyFramework.utils.ReflectionUtils;
 import com.freedy.tinyFramework.utils.StringUtils;
 import lombok.extern.slf4j.Slf4j;
 
+import java.lang.management.ManagementFactory;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
@@ -22,7 +23,7 @@ import static ch.qos.logback.core.pattern.color.ANSIConstants.*;
 public abstract class DefaultBeanFactory implements BeanFactory {
 
     {
-        printBanner("2.0.0");
+        sysInfo("2.0.0");
     }
 
     private final Map<String, Object> singletonObject = new ConcurrentHashMap<>();
@@ -120,7 +121,7 @@ public abstract class DefaultBeanFactory implements BeanFactory {
         return ts;
     }
 
-    private void printBanner(@SuppressWarnings("SameParameterValue") String version) {
+    private void sysInfo(@SuppressWarnings("SameParameterValue") String version) {
         System.out.println("""         
                   ______  ____                          ____             _____ _   _ _   _\s
                  / / / / |  _ \\ _____      _____ _ __  | __ ) _   _     |  ___| \\ | | | | |
@@ -133,6 +134,11 @@ public abstract class DefaultBeanFactory implements BeanFactory {
                 "Author:Freedy Version:" + version + "           GigHub:https://github.com/Freedy001/FNU"
                 + ESC_START + "0;" + DEFAULT_FG + ESC_END
         );
+        log.info("current System: {}", System.getProperty("os.name"));
+        String name = ManagementFactory.getRuntimeMXBean().getName();
+        String[] split = name.split("@");
+        log.info("current pid: {}" , split[0]);
+        log.info("current computer name: {}" , split[1]);
     }
 
     @Override

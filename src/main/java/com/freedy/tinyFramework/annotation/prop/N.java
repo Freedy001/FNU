@@ -5,7 +5,7 @@ package com.freedy.tinyFramework.annotation.prop;
  * @date 2021/12/7 11:02
  */
 
-public @interface Node {
-    String key();
-    String val();
+public @interface N {
+    String k();
+    String v();
 }

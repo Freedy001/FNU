@@ -26,7 +26,7 @@ public class ShrinkRespHandler implements InstructionHandler {
     @Override
     public Boolean apply(ChannelHandlerContext ctx, String[] params) {
         if (params[0].equals("refused")) {
-            log.warn("client refused to shrink channel,because the channel size has dropped to freezing point({})!", params[1]);
+            log.error("client refused to shrink channel,because the channel size has dropped to freezing point({})!", params[1]);
             //缩容失败 锁定缩容检测
             ChannelUtils.getOccupy(ctx.channel()).lockShrinkCheck();
         } else {
@@ -43,7 +43,7 @@ public class ShrinkRespHandler implements InstructionHandler {
                     if (actual >= shrinkCount) break;
                 }
             }
-            log.warn("shrink success! client expect shrink size:{},actual shrink size:{}", shrinkCount, actual);
+            log.info("shrink success! client expect shrink size:{},actual shrink size:{}", shrinkCount, actual);
         }
         //无论是否成功都，解锁扩容检测
         ChannelUtils.getOccupy(ctx.channel()).unlockExpandCheck();

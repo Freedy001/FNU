@@ -1,6 +1,6 @@
 package com.freedy.manage;
 
-import com.freedy.tinyFramework.annotation.beanContainer.Inject;
+import com.freedy.tinyFramework.annotation.Value;
 import com.freedy.tinyFramework.annotation.beanContainer.Part;
 
 /**
@@ -10,7 +10,7 @@ import com.freedy.tinyFramework.annotation.beanContainer.Part;
 @Part
 public class Test extends Response {
 
-    @Inject
+    @Value("T(com.freedy.Context).INTRANET_CHANNEL_RETRY_TIMES")
     private TestAspect testAspect;
 
 

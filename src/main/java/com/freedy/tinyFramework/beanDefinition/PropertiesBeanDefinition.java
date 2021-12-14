@@ -12,11 +12,14 @@ import lombok.ToString;
 @ToString(callSuper = true)
 @EqualsAndHashCode(callSuper = true)
 public class PropertiesBeanDefinition extends BeanDefinition{
-    String prefix;
-    boolean nonePutIfEmpty;
+    private String prefix;
+    private boolean nonePutIfEmpty;
+    private String[] exclude;
 
-    public PropertiesBeanDefinition(String beanName, Class<?> beanClass, String prefix) {
+    public PropertiesBeanDefinition(String beanName, Class<?> beanClass, String prefix,boolean nonePutIfEmpty,String[] exclude) {
         super(beanName, beanClass);
         this.prefix = prefix;
+        this.nonePutIfEmpty=nonePutIfEmpty;
+        this.exclude=exclude;
     }
 }

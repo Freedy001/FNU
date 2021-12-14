@@ -30,10 +30,19 @@ public class AuthenticAndEncrypt extends MessageToByteEncoder<ByteBuf> {
 
     public final static byte[] emptyCmd = new byte[28];
 
+    private final String aesKey;
+    private final byte[] authenticationToken;
+
+    public AuthenticAndEncrypt(String aesKey, byte[] authenticationToken) {
+        this.aesKey = aesKey;
+        this.authenticationToken = authenticationToken;
+    }
+
+
     @Override
     protected void encode(ChannelHandlerContext ctx, ByteBuf msg, ByteBuf out) {
         // authentication
-        out.writeBytes(Context.AUTHENTICATION);
+        out.writeBytes(authenticationToken);
         // cmd
         Channel channel = ctx.channel();
         byte[] cmd = ChannelUtils.getCmd(channel);
@@ -47,7 +56,6 @@ public class AuthenticAndEncrypt extends MessageToByteEncoder<ByteBuf> {
         byte[] bytes = new byte[readableBytes];
         msg.readBytes(bytes);
         // data
-        String aesKey = Context.AES_KEY;
         out.writeBytes(aesKey == null ? bytes : EncryptUtil.Encrypt(bytes, aesKey));
     }
 }

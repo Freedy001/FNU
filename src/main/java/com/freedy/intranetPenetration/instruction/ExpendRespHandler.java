@@ -33,9 +33,12 @@ public class ExpendRespHandler implements InstructionHandler {
             int totalTasks = taskQueue.size();
             int wakeUpCount = 0;
 
+            doWakeUp:
             if (totalTasks > 0) {
                 LoadBalance<Channel> loadBalance = portChannelCache.get(port);
                 ForwardTask task = taskQueue.poll();
+
+                if (task == null) break doWakeUp;
 
                 for (Channel channel : loadBalance.getAllSafely()) {
                     if (task == null) break;
@@ -51,6 +54,7 @@ public class ExpendRespHandler implements InstructionHandler {
                 }
 
                 if (task != null) {
+                    //放回剩余没执行完的任务
                     occupy.submitTask(task);
                 }
             }
@@ -61,7 +65,7 @@ public class ExpendRespHandler implements InstructionHandler {
              */
             occupy.unlockExpandCheck();
         } else {
-            log.info("expend refused! because channel size has risen to the extreme({})", param[1]);
+            log.error("expend refused! because channel size has risen to the extreme({})", param[1]);
             //扩容失败 锁定扩容检测
             occupy.lockExpandCheck();
         }

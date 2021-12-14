@@ -5,7 +5,7 @@ import com.freedy.loadBalancing.LoadBalance;
 import com.freedy.loadBalancing.LoadBalanceFactory;
 import com.freedy.tinyFramework.annotation.beanContainer.PostConstruct;
 import com.freedy.tinyFramework.annotation.prop.InjectProperties;
-import com.freedy.tinyFramework.annotation.prop.NoneForce;
+import com.freedy.tinyFramework.annotation.prop.NonStrict;
 import com.freedy.tinyFramework.annotation.prop.Skip;
 import lombok.Data;
 
@@ -14,13 +14,13 @@ import lombok.Data;
  * @date 2021/12/9 10:41
  */
 @Data
-@NoneForce
+@NonStrict
 @InjectProperties("proxy.reverse")
 public class ReverseProxyProp {
 
-    private boolean enabled=false;
-    private int port=2000;
-    private boolean jumpEndPoint =false;
+    private Boolean enabled=false;
+    private Integer port=2000;
+    private Boolean jumpEndPoint =false;
 
     private String BalanceAlgorithm="Round Robin";
     private String[] serverAddress;

@@ -1,7 +1,6 @@
 package com.freedy.intranetPenetration.remote;
 
 import com.freedy.tinyFramework.annotation.prop.InjectProperties;
-import com.freedy.tinyFramework.annotation.prop.NoneForce;
 import lombok.Data;
 
 /**
@@ -9,10 +8,9 @@ import lombok.Data;
  * @date 2021/12/9 18:03
  */
 @Data
-@NoneForce
-@InjectProperties("intranet.remote")
+@InjectProperties(value = "intranet.remote",nonePutIfEmpty = true)
 public class RemoteProp {
-    private boolean enabled;
-    private int port;
+    private Boolean enabled;
+    private Integer port;
     private String loadBalancing;
 }

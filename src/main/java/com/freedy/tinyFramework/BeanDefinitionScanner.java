@@ -83,7 +83,13 @@ public class BeanDefinitionScanner implements Scanner {
                 if (StringUtils.isEmpty(beanName)) {
                     beanName = convertName(beanClass.getSimpleName());
                 }
-                BeanDefinition definition = new PropertiesBeanDefinition(beanName, beanClass, properties.value());
+                BeanDefinition definition = new PropertiesBeanDefinition(
+                        beanName,
+                        beanClass,
+                        properties.value(),
+                        properties.nonePutIfEmpty(),
+                        properties.exclude()
+                );
                 findInjectMethodOrPostConstructMethod(beanClass, definition);
                 abstractApplication.registerBeanDefinition(definition);
                 continue;

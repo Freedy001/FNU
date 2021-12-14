@@ -1,7 +1,9 @@
 package com.freedy;
 
 import com.freedy.intranetPenetration.ChannelSentinel;
+import com.freedy.intranetPenetration.OccupyState;
 import com.freedy.intranetPenetration.Protocol;
+import com.freedy.intranetPenetration.instruction.*;
 import com.freedy.intranetPenetration.local.LocalProp;
 import com.freedy.intranetPenetration.remote.ChanelWarehouse;
 import com.freedy.intranetPenetration.remote.RemoteProp;
@@ -57,7 +59,9 @@ public class ServerStarter {
     @Getter
     private long intranetRemoteStartTime = 0;
     @Inject
-    private BeanFactory factory;
+    private BeanFactory beanFactory;
+    @Inject
+    private NioEventLoopGroup worker;
 
     @Bean
     public NioEventLoopGroup work(){
@@ -65,8 +69,8 @@ public class ServerStarter {
     }
 
     @Bean
-    public Channel reverseProxy(ReverseProxyProp reverseProxyProp,@Inject("worker") NioEventLoopGroup worker) throws Exception {
-        if (!reverseProxyProp.isEnabled()) return null;
+    public Channel reverseProxy(ReverseProxyProp reverseProxyProp) throws Exception {
+        if (!reverseProxyProp.getEnabled()) return null;
         ServerBootstrap bootstrap = new ServerBootstrap();
         bootstrap.option(ChannelOption.SO_BACKLOG, 10240)
                 .group(new NioEventLoopGroup(1), worker)
@@ -74,7 +78,7 @@ public class ServerStarter {
                 .childHandler(new ChannelInitializer<>() {
                     @Override
                     protected void initChannel(Channel ch) {
-                        ch.pipeline().addLast(factory.getBean(MsgForward.class));
+                        ch.pipeline().addLast(beanFactory.getBean(MsgForward.class));
                     }
                 });
 
@@ -84,9 +88,9 @@ public class ServerStarter {
         return channel;
     }
 
-    @Bean
-    public Channel httpProxy(HttpProxyProp httpProxyProp,@Inject("worker") NioEventLoopGroup worker) throws Exception {
-        if (!httpProxyProp.isEnabled()) return null;
+    @Bean(conditionalOnBeanByType = HttpProxyProp.class)
+    public Channel httpProxy(HttpProxyProp httpProxyProp,EncryptProp encryptProp) throws Exception {
+        if (!httpProxyProp.getEnabled()) return null;
         ServerBootstrap bootstrap = new ServerBootstrap();
         bootstrap.option(ChannelOption.SO_BACKLOG, 10240)
                 .group(new NioEventLoopGroup(1), worker)
@@ -94,23 +98,23 @@ public class ServerStarter {
                 .childHandler(new ChannelInitializer<>() {
                     @Override
                     protected void initChannel(Channel ch) {
-                        if (!httpProxyProp.isJumpEndPoint()) {
+                        if (!httpProxyProp.getJumpEndPoint()) {
                             ch.pipeline().addLast(
                                     new HttpRequestDecoder(),
                                     new HttpResponseEncoder(),
                                     new HttpObjectAggregator(Integer.MAX_VALUE),
-                                    factory.getBean(HttpProxyHandler.class)
+                                    beanFactory.getBean(HttpProxyHandler.class)
                             );
                         } else {
                             ch.pipeline().addLast(
                                     new LengthFieldBasedFrameDecoder(Integer.MAX_VALUE, 0, 4, 0, 4),
                                     new LengthFieldPrepender(4),
-                                    new AuthenticAndEncrypt(),
-                                    new AuthenticAndDecrypt(null),
+                                    new AuthenticAndEncrypt(encryptProp.getAesKey(),encryptProp.getAuthenticationToken()),
+                                    new AuthenticAndDecrypt(encryptProp.getAesKey(),encryptProp.getAuthenticationToken(),null),
                                     new HttpRequestDecoder(),
                                     new HttpResponseEncoder(),
                                     new HttpObjectAggregator(Integer.MAX_VALUE),
-                                    factory.getBean(HttpProxyHandler.class)
+                                    beanFactory.getBean(HttpProxyHandler.class)
                             );
                         }
                     }
@@ -124,7 +128,7 @@ public class ServerStarter {
 
     @Bean
     public byte[] pac(ReverseProxyProp reverseProxyProp) {
-        if (reverseProxyProp.isJumpEndPoint()) {
+        if (reverseProxyProp.getJumpEndPoint()) {
             InputStream pacFile = MsgForward.class.getClassLoader().getResourceAsStream("pac");
             try {
                 assert pacFile != null;
@@ -138,7 +142,7 @@ public class ServerStarter {
     }
 
     @Bean
-    public Bootstrap bootstrap(NioEventLoopGroup worker) {
+    public Bootstrap bootstrap() {
         Bootstrap bootstrap = new Bootstrap();
         bootstrap.group(worker)
                 .channel(NioSocketChannel.class)
@@ -152,6 +156,7 @@ public class ServerStarter {
         return bootstrap;
     }
 
+
     /**
      * 内网穿透本地服务 配置信息与之对应的缓存管道map
      */
@@ -163,11 +168,12 @@ public class ServerStarter {
     /**
      * 启动内网穿透本地服务
      */
-    @Bean("sentinelDaemonThread")
+    @Bean(value = "sentinelDaemonThread",conditionalOnBeanByType = LocalProp.class)
     public Thread intranetLocalServer(
             @Inject("remoteChannelMap") Map<Struct.ConfigGroup, List<Channel>> remoteChannelMap,
             LocalProp localProp, ChannelSentinel sentinel) {
-        if (!localProp.isEnabled()) return null;
+        if (!localProp.getEnabled()) return null;
+        registerIntranetLocalInstructionHandler();
         //初始化配置消息
         for (Struct.ConfigGroup group : localProp.getConfigGroupList()) {
             remoteChannelMap.put(group, new CopyOnWriteArrayList<>());
@@ -186,7 +192,9 @@ public class ServerStarter {
      */
     @Bean("portChannelCache")
     public Map<Integer, LoadBalance<Channel>> intranetRemoteServer() {
-        return new ConcurrentHashMap<>();
+        Map<Integer, LoadBalance<Channel>> map = new ConcurrentHashMap<>();
+        OccupyState.initPortChannelCache(map);
+        return map;
     }
 
     /**
@@ -200,9 +208,10 @@ public class ServerStarter {
     /**
      * 启动内网穿透远程服务
      */
-    @Bean
-    public Channel intranetRemoteServer(RemoteProp prop,NioEventLoopGroup worker) throws InterruptedException {
-        if (!prop.isEnabled()) return null;
+    @Bean(conditionalOnBeanByType = RemoteProp.class)
+    public Channel intranetRemoteServer(RemoteProp prop,EncryptProp encryptProp) throws InterruptedException {
+        if (!prop.getEnabled()) return null;
+        registerIntranetRemoteInstructionHandler();
         ServerBootstrap bootstrap = new ServerBootstrap();
         Channel channel = bootstrap.group(
                         new NioEventLoopGroup(1),
@@ -216,12 +225,12 @@ public class ServerStarter {
                         channel.pipeline().addLast(
                                 new LengthFieldBasedFrameDecoder(Integer.MAX_VALUE, 0, 4, 0, 4),
                                 new LengthFieldPrepender(4),
-                                new AuthenticAndEncrypt(),
-                                new AuthenticAndDecrypt(Protocol::invokeHandler),
+                                new AuthenticAndEncrypt(encryptProp.getAesKey(),encryptProp.getAuthenticationToken()),
+                                new AuthenticAndDecrypt(encryptProp.getAesKey(),encryptProp.getAuthenticationToken(),Protocol::invokeHandler),
                                 new ObjectEncoder(),
                                 new ObjectDecoder(ClassResolvers.cacheDisabled(ServerStarter.class.getClassLoader())),
-                                factory.getBean(ChanelWarehouse.class),
-                                factory.getBean(ServerHandshake.class)
+                                beanFactory.getBean(ChanelWarehouse.class),
+                                beanFactory.getBean(ServerHandshake.class)
                         );
                     }
                 })
@@ -230,6 +239,22 @@ public class ServerStarter {
         log.info("Intranet-Remote-Master-Server started success on http://127.0.0.1:{}/",prop.getPort());
         intranetRemoteStartTime=System.currentTimeMillis();
         return channel;
+    }
+
+    private void registerIntranetRemoteInstructionHandler(){
+        Protocol.HEARTBEAT_LOCAL_NORMAL_MSG.registerInstructionHandler(beanFactory.getBean(HeartBeatLocalNormalMsgHandler.class));
+        Protocol.HEARTBEAT_LOCAL_ERROR_MSG.registerInstructionHandler(beanFactory.getBean(HeartbeatLocalErrorMsgHandler.class));
+        Protocol.EXPEND_RESP.registerInstructionHandler(beanFactory.getBean(ExpendRespHandler.class));
+        Protocol.REMOTE_SHUTDOWN.registerInstructionHandler(beanFactory.getBean(RemoteShutdownHandler.class));
+        Protocol.SHRINK_RESP.registerInstructionHandler(beanFactory.getBean(ShrinkRespHandler.class));
+    }
+
+    private void registerIntranetLocalInstructionHandler(){
+        Protocol.HEARTBEAT_REMOTE_NORMAL_MSG.registerInstructionHandler(new InstructionHandler() {
+        });
+        Protocol.HEARTBEAT_REMOTE_ERROR_MSG.registerInstructionHandler(beanFactory.getBean(HeartBeatRemoteErrorMsgHandler.class));
+        Protocol.EXPEND.registerInstructionHandler(beanFactory.getBean(ExpendHandler.class));
+        Protocol.SHRINK.registerInstructionHandler(beanFactory.getBean(ShrinkHandler.class));
     }
 
 }

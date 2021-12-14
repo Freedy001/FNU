@@ -26,7 +26,6 @@ import static com.freedy.tinyFramework.utils.DateUtils.getDateStrPattern;
 @SuppressWarnings({"rawtypes", "unchecked"})
 public class ReflectionUtils {
 
-
     /**
      * 通过getter方法获取指定字段名的值
      *
@@ -319,7 +318,7 @@ public class ReflectionUtils {
     }
 
 
-    public static boolean isBasicType(Class<?> type) {
+    public static boolean isRegularType(Class<?> type) {
         switch (type.getSimpleName()) {
             case "Integer", "int", "Long", "long",
                     "Double", "double", "Float", "float",
@@ -331,6 +330,48 @@ public class ReflectionUtils {
                 return false;
             }
         }
+    }
+
+    public static boolean isBasicType(Class<?> type) {
+        switch (type.getSimpleName()) {
+            case "int", "long",
+                    "double", "float",
+                    "boolean", "short",
+                    "byte", "char" -> {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static Class<?> convertToWrapper(Class<?> type) {
+        switch (type.getSimpleName()) {
+            case "int" -> {
+                return Integer.class;
+            }
+            case "long" -> {
+                return Long.class;
+            }
+            case "double" -> {
+                return Double.class;
+            }
+            case "float" -> {
+                return Float.class;
+            }
+            case "boolean" -> {
+                return Boolean.class;
+            }
+            case "short" -> {
+                return Short.class;
+            }
+            case "byte" -> {
+                return Byte.class;
+            }
+            case "char" -> {
+                return Character.class;
+            }
+        }
+        return type;
     }
 
     public static <T> T convertType(Object strValue, Class<T> type) {
@@ -462,6 +503,28 @@ public class ReflectionUtils {
         }
         fieldVal = newArray;
         return fieldVal;
+    }
+
+    /**
+     * 检测一个对象是否所有字段都为空
+     *
+     * @param obj 需要被检测的字段
+     * @return 返回null表示不是所有字段为空  返回field表示为空的那个field
+     */
+    @SneakyThrows
+    public static Field checkNull(Object obj) {
+        for (Field field : obj.getClass().getDeclaredFields()) {
+            field.setAccessible(true);
+            Object fieldObj = field.get(obj);
+            if (fieldObj == null) return field;
+            if (!isRegularType(field.getType())) {
+                Field checkNone = checkNull(fieldObj);
+                if (checkNone != null) {
+                    return field;
+                }
+            }
+        }
+        return null;
     }
 
 }

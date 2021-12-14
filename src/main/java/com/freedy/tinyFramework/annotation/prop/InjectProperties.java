@@ -80,7 +80,7 @@ import java.lang.annotation.*;
  *
  * <h2>非强制赋值</h2>
  * 默认赋值规则为强制赋值,即如果声明的字段在配置文件中找不到就会抛异常。
- * 可以使用{{@link NoneForce}}注解，禁用非强制赋值
+ * 可以使用{{@link NonStrict}}注解，禁用非强制赋值
  *
  *
  * @author Freedy
@@ -99,6 +99,25 @@ public @interface InjectProperties {
      * bean名称
      */
     String beanName() default "";
+
+    /**
+     * 指定需要被排除的字段
+     */
+    String[] exclude() default {};
+
+    /**
+     * 指定那个字段要被排除
+     */
+    @Target(ElementType.FIELD)
+    @Retention(RetentionPolicy.RUNTIME)
+    @interface Exclude {
+        /**
+         * 如果标注的字段是一个非基本类型则可以使用此属性对子对象相关的字段进行排除， <br/>
+         * <b>注意！如果标有此注解的字段没有指名exclude()则整个字段将被排除</b>
+         */
+        String[] exclude() default {};
+    }
+
 
     /**
      * 当需要被属性注入的bean没有一条数据被注入时不对该bean放入容器

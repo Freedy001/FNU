@@ -3,7 +3,6 @@ package com.freedy.intranetPenetration.local;
 import com.freedy.Struct;
 import com.freedy.tinyFramework.annotation.beanContainer.PostConstruct;
 import com.freedy.tinyFramework.annotation.prop.InjectProperties;
-import com.freedy.tinyFramework.annotation.prop.NoneForce;
 import com.freedy.tinyFramework.annotation.prop.Skip;
 import com.freedy.tinyFramework.exception.IllegalArgumentException;
 import com.freedy.utils.ChannelUtils;
@@ -16,19 +15,19 @@ import java.util.List;
  * @author Freedy
  * @date 2021/12/9 15:42
  */
-@NoneForce
 @Data
-@InjectProperties("intranet.local")
+@InjectProperties(value = "intranet.local", nonePutIfEmpty = true)
 public class LocalProp {
-    private boolean enabled;
-    private int minChannelCount;
-    private int maxChannelCount;
+    private Boolean enabled;
+    private Integer minChannelCount;
+    private Integer maxChannelCount;
     private List<Config> group;
+
     @Skip
-    private List<Struct.ConfigGroup> configGroupList=new ArrayList<>();
+    private List<Struct.ConfigGroup> configGroupList = new ArrayList<>();
 
     @PostConstruct
-    public void init(){
+    public void init() {
         if (!enabled) return;
         for (Config config : group) {
             Struct.ConfigGroup group = new Struct.ConfigGroup();

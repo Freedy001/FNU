@@ -2,7 +2,6 @@ package com.freedy.intranetPenetration;
 
 import com.freedy.Struct;
 import com.freedy.loadBalancing.LoadBalance;
-import com.freedy.tinyFramework.beanFactory.BeanFactory;
 import com.freedy.utils.ChannelUtils;
 import io.netty.channel.Channel;
 import lombok.Getter;
@@ -30,54 +29,41 @@ import java.util.concurrent.atomic.AtomicInteger;
 @ToString
 public class OccupyState {
     //公用变量
-    //上次释放锁的时间
-    private static final Map<Integer, long[]> lastReleaseTimeMap = new ConcurrentHashMap<>();
     //每个服务对应一个任务队列,同一个的服务的多个管道公用一个任务队列
     private static final Map<Integer, Queue<ForwardTask>> wakeupMap = new ConcurrentHashMap<>();
     //每个服务对应一个缩容临界值的次数
     private static final Map<Integer, AtomicInteger> shrinkCountMap = new ConcurrentHashMap<>();
-    //每个服务对应一个是否检查缩容
-    private static final Map<Integer, Boolean> checkShrink = new ConcurrentHashMap<>();
-    private static final Map<Integer, Struct.BoolWithStamp> checkExpandMap = new ConcurrentHashMap<>();
 
+    //每个服务对应一个是否 检查扩容
+    private static final Map<Integer, Struct.BoolWithStamp> checkExpandMap = new ConcurrentHashMap<>();
+    //每个服务对应一个是否 检查缩容
+    private static final Map<Integer, Boolean> checkShrink = new ConcurrentHashMap<>();
+    //对应服务的 管道缓存
     private static Map<Integer, LoadBalance<Channel>> portChannelCache;
+    //对应服务的 管道繁忙数量
+    private static final Map<Integer, AtomicInteger> portBusyCount = new ConcurrentHashMap<>();
+
+    public static void initPortChannelCache(Map<Integer, LoadBalance<Channel>> portChannelCache) {
+        OccupyState.portChannelCache = portChannelCache;
+    }
 
     public static void initTaskQueue(int serverPort) {
-        lastReleaseTimeMap.put(serverPort, new long[]{System.currentTimeMillis()});
         wakeupMap.put(serverPort, new ConcurrentLinkedQueue<>());
         shrinkCountMap.put(serverPort, new AtomicInteger());
         checkExpandMap.put(serverPort, new Struct.BoolWithStamp());
+        portBusyCount.put(serverPort, new AtomicInteger());
     }
 
     public static void removeTaskQueue(int serverPort) {
-        lastReleaseTimeMap.remove(serverPort);
         wakeupMap.remove(serverPort);
         shrinkCountMap.remove(serverPort);
         checkExpandMap.remove(serverPort);
+        portBusyCount.put(serverPort, new AtomicInteger());
     }
 
     public static void inspectChannelState() {
-        portChannelCache.forEach((k, v) -> {
-            int busy = getBusyChannelCount(v);
-            try {
-                int channelSize = v.size();
-                int taskQueueSize = wakeupMap.get(k).size();
-                log.debug("[REMOTE-HEART-RECEIVE]: service channel status port:{} total channel size: {} busy channel size:{}  taskQueue size: {}", k, channelSize, busy, taskQueueSize);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        });
+        portChannelCache.forEach((k, v) -> log.debug("[REMOTE-HEART-RECEIVE]: service channel status port:{} total channel size: {} busy channel size:{}  taskQueue size: {}", k, v.size(), portBusyCount.get(k).get(), wakeupMap.get(k).size()));
     }
-
-    private static int getBusyChannelCount(LoadBalance<Channel> loadBalance) {
-        int count = 0;
-        for (Channel channel : loadBalance.getAllSafely()) {
-            if (ChannelUtils.getOccupy(channel).occupied.get())
-                count++;
-        }
-        return count;
-    }
-
 
     //是否被占用
     private final AtomicBoolean occupied = new AtomicBoolean(false);
@@ -90,28 +76,31 @@ public class OccupyState {
     @Getter
     private final int serverPort;
     /*
-     * 以下四个对象 在相同的serverPort的channel中所引用的对象是相同的
-     * 言外之意，同一个服务的所有管道公用以下三个对象
+     * 以下六个对象 在相同的serverPort的channel中所引用的对象是相同的
+     * 言外之意，同一个服务的所有管道公用以下六个对象
      */
     //任务队列
     @Getter
     private final Queue<ForwardTask> taskQueue;
     //达到管道缩容临界值的次数
     private final AtomicInteger shrinkCount;
-    //检测缩容
-    private final long[] lastReleaseTime;
     private final Struct.BoolWithStamp checkExpand;
+    private final AtomicInteger channelBusyCount;
+    private long totalChannel;
 
-    @SuppressWarnings("unchecked")
-    public OccupyState(Channel intranetChannel, int serverPort, BeanFactory factory) {
+    public OccupyState(Channel intranetChannel, int serverPort) {
         this.intranetChannel = intranetChannel;
         this.serverPort = serverPort;
-        this.lastReleaseTime = lastReleaseTimeMap.get(serverPort);
         this.taskQueue = wakeupMap.get(serverPort);
         this.shrinkCount = shrinkCountMap.get(serverPort);
         this.checkExpand = checkExpandMap.get(serverPort);
-        portChannelCache = (Map<Integer, LoadBalance<Channel>>) factory.getBean("portChannelCache", Map.class);
+        this.channelBusyCount = portBusyCount.get(serverPort);
+
+        LoadBalance<Channel> balance = portChannelCache.get(serverPort);
+        balance.registerElementChangeEvent(lb -> this.totalChannel = lb.size());
+        this.totalChannel = balance.size();
     }
+
 
     /**
      * 当管道数达到最小值，就不需要检测是否需要缩容了
@@ -157,6 +146,18 @@ public class OccupyState {
     public boolean tryOccupy(Channel channel) {
         if (occupied.compareAndSet(false, true)) {
             receiverChannel = channel;
+            if (checkExpand.get()) return true;
+            int busyCount = channelBusyCount.incrementAndGet();
+            int expandCount = busyCount + busyCount >> 1 - totalChannel;
+            if (expandCount > 0) {
+                /*
+                 * 在发送扩容命令后，会让channelCache短时间无法发送扩容命令。
+                 * 主要是防止重复提交扩容命令。指定解锁时间，防止通讯消息丢失，导致死锁。
+                 */
+                lockExpandCheck(5, TimeUnit.SECONDS);
+                //need to expand
+                ChannelUtils.setCmd(intranetChannel, Protocol.EXPEND.param(expandCount));
+            }
             return true;
         }
         return receiverChannel == channel;
@@ -164,18 +165,6 @@ public class OccupyState {
 
     public void submitTask(ForwardTask task) {
         taskQueue.offer(task);
-
-        if (checkExpand.get()) return;
-        int taskQueueSize = taskQueue.size();
-        if (taskQueueSize > 0) {
-            /*
-             * 在发送扩容命令后，会让channelCache短时间无法发送扩容命令。
-             * 主要是防止重复提交扩容命令。指定解锁时间，防止通讯消息丢失，导致死锁。
-             */
-            lockExpandCheck(5, TimeUnit.SECONDS);
-            //need to expand
-            ChannelUtils.setCmd(intranetChannel, Protocol.EXPEND.param(taskQueueSize >> 1 + taskQueueSize));
-        }
     }
 
     public void release(Channel channel) {
@@ -185,6 +174,7 @@ public class OccupyState {
         }
         ForwardTask task = taskQueue.poll();
         if (task == null) {
+            channelBusyCount.decrementAndGet();
             receiverChannel = null;
             occupied.set(false);
             if (Optional.ofNullable(checkShrink.get(serverPort)).orElse(true)) {
@@ -197,12 +187,11 @@ public class OccupyState {
             //获取任务队列中所有能用receiverChannel发给用户的任务并执行
             executeSameReceiverTask(task);
         }
-        lastReleaseTime[0] = System.currentTimeMillis();
     }
 
     private void shrinkTask() {
         LoadBalance<Channel> loadBalance = portChannelCache.get(serverPort);
-        int busyCount = getBusyChannelCount(loadBalance);
+        int busyCount = channelBusyCount.get();
         //预留1/2的管道缓存空间
         if (loadBalance.size() > busyCount + (busyCount >> 1)) {
             //shrink
@@ -218,7 +207,7 @@ public class OccupyState {
             lockShrinkCheck();
             intranetChannel.eventLoop().schedule(() -> {
                 try {
-                    int bCount = getBusyChannelCount(loadBalance);
+                    int bCount = channelBusyCount.get();
                     //预留1/4的管道缓存空间
                     int shrink = loadBalance.size() - (bCount + (bCount >> 1));
                     if (shrink > 0) {

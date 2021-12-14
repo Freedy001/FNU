@@ -57,7 +57,7 @@ public class PlaceholderParser {
     private String highLightStrEnd;
     private String highLightNumStart;
     private String highLightNumEnd;
-
+    private final List<Class<?>> noneHighLightClass=new ArrayList<>();
     /**
      * 解析sql
      *
@@ -156,6 +156,11 @@ public class PlaceholderParser {
             sqlBuilder.append(joinSql);
             this.params.addAll(Arrays.asList(params));
         }
+        return this;
+    }
+
+    public PlaceholderParser registerNoneHighLightClass(Class<?> ...classes){
+        noneHighLightClass.addAll(Arrays.asList(classes));
         return this;
     }
 
@@ -316,9 +321,16 @@ public class PlaceholderParser {
             sqlString.append(highLightNumStart).append(item).append(highLightNumEnd).append(split);
         } else {
             String str = String.valueOf(item);
+
             if ((str).startsWith("{!}")) {
                 sqlString.append(str.substring(3)).append(split);
             } else {
+                for (Class<?> noneHighLightClass : noneHighLightClass) {
+                    if (noneHighLightClass.isInstance(item)) {
+                        sqlString.append(str).append(split);
+                        return;
+                    }
+                }
                 sqlString.append(highLightStrStart).append(str).append(highLightStrEnd).append(split);
             }
         }

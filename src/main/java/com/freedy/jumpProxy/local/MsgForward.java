@@ -1,9 +1,6 @@
 package com.freedy.jumpProxy.local;
 
-import com.freedy.AuthenticAndDecrypt;
-import com.freedy.AuthenticAndEncrypt;
-import com.freedy.Context;
-import com.freedy.Struct;
+import com.freedy.*;
 import com.freedy.errorProcessor.ErrorHandler;
 import com.freedy.jumpProxy.ReverseProxyProp;
 import com.freedy.loadBalancing.LoadBalance;
@@ -45,14 +42,16 @@ public class MsgForward extends ChannelInboundHandlerAdapter {
     private final boolean jumpEndPoint;
     private final byte[] pacData;
 
+    @Inject
+    private EncryptProp encryptProp;
 
     private String remoteAddress;
     private int remotePort;
 
-    public MsgForward(ReverseProxyProp proxyProp, @Inject("pac") byte[] pacData) {
+    public MsgForward(ReverseProxyProp proxyProp,@Inject("pac") byte[] pacData) {
         this.lb = proxyProp.getReverseProxyLB();
         this.port = proxyProp.getPort();
-        this.jumpEndPoint = proxyProp.isJumpEndPoint();
+        this.jumpEndPoint = proxyProp.getJumpEndPoint();
         this.pacData = pacData;
     }
 
@@ -72,8 +71,8 @@ public class MsgForward extends ChannelInboundHandlerAdapter {
                 channel.pipeline().addLast(
                         new LengthFieldBasedFrameDecoder(Integer.MAX_VALUE, 0, 4, 0, 4),
                         new LengthFieldPrepender(4),
-                        new AuthenticAndEncrypt(),
-                        new AuthenticAndDecrypt(null),
+                        new AuthenticAndEncrypt(encryptProp.getAesKey(),encryptProp.getAuthenticationToken()),
+                        new AuthenticAndDecrypt(encryptProp.getAesKey(),encryptProp.getAuthenticationToken(),null),
                         new LocalMsgForward(localChannel, port)
                 );
             } else {
@@ -83,7 +82,7 @@ public class MsgForward extends ChannelInboundHandlerAdapter {
     }
 
     @Override
-    public void channelRead(ChannelHandlerContext ctx, Object msg) throws InterruptedException {
+    public void channelRead(ChannelHandlerContext ctx, Object msg) {
         Channel localChannel = ctx.channel();
 
         //获取包信息

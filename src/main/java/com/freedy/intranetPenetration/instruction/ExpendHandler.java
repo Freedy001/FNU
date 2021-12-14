@@ -1,9 +1,9 @@
 package com.freedy.intranetPenetration.instruction;
 
-import com.freedy.Context;
 import com.freedy.Struct;
 import com.freedy.intranetPenetration.Protocol;
 import com.freedy.intranetPenetration.local.ClientConnector;
+import com.freedy.intranetPenetration.local.LocalProp;
 import com.freedy.tinyFramework.annotation.beanContainer.Inject;
 import com.freedy.tinyFramework.annotation.beanContainer.Part;
 import com.freedy.utils.ChannelUtils;
@@ -28,17 +28,23 @@ public class ExpendHandler implements InstructionHandler {
     @Inject("remoteChannelMap")
     private Map<Struct.ConfigGroup, List<Channel>> remoteChannelMap;
 
+    @Inject
+    private LocalProp prop;
+
     @Override
     public Boolean apply(ChannelHandlerContext ctx, String[] param) {
         log.warn("receive expand cmd,start to expand channel cache size");
         Channel channel = ctx.channel();
         Struct.ConfigGroup group = ChannelUtils.getGroup(channel);
         int expandSize = Integer.parseInt(param[0]);
-        if (expandSize > Context.INTRANET_CHANNEL_CACHE_MAX_SIZE) {
-            expandSize = Context.INTRANET_CHANNEL_CACHE_MAX_SIZE - remoteChannelMap.get(group).size();
+
+        int maxChannelCount = prop.getMaxChannelCount();
+        int maxExpandSize = maxChannelCount - remoteChannelMap.get(group).size();
+        if (expandSize > maxExpandSize) {
+            expandSize = maxExpandSize;
         }
-        if (expandSize == 0) {
-            ChannelUtils.setCmdAndSend(channel, Protocol.EXPEND_RESP.param("refuse").param(Context.INTRANET_CHANNEL_CACHE_MAX_SIZE));
+        if (expandSize <= 0) {
+            ChannelUtils.setCmdAndSend(channel, Protocol.EXPEND_RESP.param("refuse").param(maxChannelCount));
             return true;
         }
         int successSize = 0;

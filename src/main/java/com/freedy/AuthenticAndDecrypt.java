@@ -33,11 +33,18 @@ public class AuthenticAndDecrypt extends ByteToMessageDecoder {
 
     private final BiFunction<ChannelHandlerContext, String, Boolean> cmdInterception;
 
-    public AuthenticAndDecrypt() {
+    private final String aesKey;
+    private final byte[] authenticationToken;
+
+    public AuthenticAndDecrypt(String aesKey, byte[] authenticationToken) {
+        this.aesKey=aesKey;
+        this.authenticationToken=authenticationToken;
         cmdInterception = null;
     }
 
-    public AuthenticAndDecrypt(BiFunction<ChannelHandlerContext, String, Boolean> cmdInterception) {
+    public AuthenticAndDecrypt(String aesKey, byte[] authenticationToken,BiFunction<ChannelHandlerContext, String, Boolean>cmdInterception) {
+        this.aesKey=aesKey;
+        this.authenticationToken=authenticationToken;
         this.cmdInterception = cmdInterception;
     }
 
@@ -48,7 +55,7 @@ public class AuthenticAndDecrypt extends ByteToMessageDecoder {
         //身份认证
         byte[] authentication = new byte[32];
         in.readBytes(authentication);
-        if (!Arrays.equals(authentication, Context.AUTHENTICATION)) {
+        if (!Arrays.equals(authentication, authenticationToken)) {
             log.error("remote channel{} authentic fail!", ctx.channel().remoteAddress());
             ctx.channel().close();
             return;
@@ -67,7 +74,6 @@ public class AuthenticAndDecrypt extends ByteToMessageDecoder {
         //数据
         byte[] data = new byte[readableBytes - Context.CMD_LENGTH - 32];
         in.readBytes(data);
-        String aesKey = Context.AES_KEY;
         out.add(Unpooled.wrappedBuffer(aesKey == null ? data : EncryptUtil.Decrypt(data, aesKey)));
     }
 }

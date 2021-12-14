@@ -73,22 +73,24 @@ public abstract class AbstractApplication extends DefaultBeanFactory {
         for (Field field : ReflectionUtils.getFieldsRecursion(bean.getClass())) {
             Inject inject = field.getAnnotation(Inject.class);
             if (inject == null) continue;
+            Class<?> type = field.getType();
+
+            //by name
             String byName = inject.value();
             if (StringUtils.hasText(byName)) {
-                //by name
                 field.setAccessible(true);
                 Object dependency = getBean(byName);
                 if (dependency == null) {
-                    throw new NoSuchBeanException("no bean[name:?] in the container", byName);
+                    log.error("can not find bean[name:{},type:{}] in the container.", byName, type.getName());
                 }
                 field.set(bean, dependency);
                 continue;
             }
+
             //by type
-            Class<?> type = field.getType();
             Object dependency = getBean(type, field.getName());
             if (dependency == null) {
-                throw new NoSuchBeanException("no bean[type:?] in the container", type.getName());
+                log.error("can not find bean[type:{}] in the container.", type.getName());
             }
             field.set(bean, dependency);
         }
@@ -120,6 +122,7 @@ public abstract class AbstractApplication extends DefaultBeanFactory {
             Object bean = super.getBean(beanType);
             if (bean != null) return bean;
         } catch (Exception ignored) {
+            //do nothing
         }
 
         List<?> list = getBeansForType(beanType);
@@ -202,7 +205,7 @@ public abstract class AbstractApplication extends DefaultBeanFactory {
                     //获取bean
                     dependency = getBean(dependencyBeanName);
                     if (dependency == null) {
-                        throw new NoSuchBeanException("can not find bean definition[name:?] in the container,please register one", dependencyBeanName);
+                        log.error("can not find bean[name:{},type:{}] in the container.", dependencyBeanName, type.getName());
                     }
                     try {
                         //转换对代理类型的bean进行转换
@@ -217,7 +220,7 @@ public abstract class AbstractApplication extends DefaultBeanFactory {
                 //by type inject
                 dependency = getBean(type, field.getName());
                 if (dependency == null) {
-                    throw new NoSuchBeanException("can not find bean definition[type:?] in the container,please register one", type.getName());
+                    log.error("can not find bean[type:{}] in the container.", type.getName());
                 }
                 try {
                     //转换对代理类型的bean进行转换
@@ -250,6 +253,7 @@ public abstract class AbstractApplication extends DefaultBeanFactory {
     }
 
     private Object checkAndConvertProxyType(Class<?> fieldDependencyType, Object dependency, String dependencyBeanName) {
+        if (dependency == null) return null;
         if (!fieldDependencyType.isInstance(dependency)) {
             //不能转换可能是jdk动态代理产生的类
             if (dependency instanceof ProxyProcessor.ProxyMataInfo mataInfo) {
@@ -281,34 +285,35 @@ public abstract class AbstractApplication extends DefaultBeanFactory {
             //处理ConfigBeanDefinition
             if (definition instanceof ConfigBeanDefinition configDefinition) {
                 Bean info = configDefinition.getBeanInfo();
-                String beanByName = info.conditionalOnBeanByName();
                 boolean missCondition = false;
                 creteConfigBean:
                 {
-                    if (StringUtils.hasText(beanByName) && !beanDefinition.containsKey(beanByName)) {
+                    String beanByName = info.conditionalOnBeanByName();
+                    if (StringUtils.hasText(beanByName) && getBean(beanByName) == null) {
                         missCondition = true;
                         break creteConfigBean;
                     }
                     Class<?> beanByType = info.conditionalOnBeanByType();
-                    if (beanByType != Bean.class && !beanTypeDefinition.containsKey(beanByType)) {
+                    if (beanByType != Bean.class && getBean(beanByType) == null) {
                         missCondition = true;
                         break creteConfigBean;
                     }
                     String missBeanByName = info.conditionalOnMissBeanByName();
-                    if (StringUtils.hasText(missBeanByName) && beanDefinition.containsKey(beanByName)) {
+                    if (StringUtils.hasText(missBeanByName) && getBean(missBeanByName) != null) {
                         missCondition = true;
                         break creteConfigBean;
                     }
                     Class<?> missBeanByType = info.conditionalOnMissBeanByTyp();
-                    if (missBeanByType != Bean.class && beanTypeDefinition.containsKey(beanByType)) {
+                    if (missBeanByType != Bean.class && getBean(missBeanByType) != null) {
                         missCondition = true;
                     }
                 }
                 Method method = configDefinition.getBeanFactoryMethod();
                 //不满足条件且不是容器初始化时
-                if (missCondition && !LockProvider.initContainer.isInitialized())
+                if (missCondition) {
+                    if (LockProvider.initContainer.isInitialized()) return null;
                     throw new NoSuchBeanException("can't acquire config bean ?,because the factory method[?] do not meet the condition", definition.getBeanName(), method);
-
+                }
                 List<Object> args = getArgumentsFromBeanContainer(method);
                 try {
                     bean = method.invoke(getBean(method.getDeclaringClass()), args.toArray());
@@ -327,9 +332,12 @@ public abstract class AbstractApplication extends DefaultBeanFactory {
                 //普通注入
                 bean = injectByConstruct(definition.getBeanClass());
                 //属性注入
-                if (!propertiesExtractor.injectProperties(propDefinition.getPrefix(), bean)) {
+                if (!propertiesExtractor.injectProperties(propDefinition.getPrefix(), bean, Set.of(propDefinition.getExclude())) &&
+                        propDefinition.isNonePutIfEmpty()) {
+                    //没有注入 且 注解中NonePutIfEmpty为true时不将bean放入容器
                     bean = null;
                 }
+
                 hasConstruct = true;
             }
             if (!hasConstruct) {

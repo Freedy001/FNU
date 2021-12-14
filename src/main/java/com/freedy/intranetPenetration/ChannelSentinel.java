@@ -39,7 +39,8 @@ public class ChannelSentinel extends TimerTask {
 
     @PostConstruct
     private void initExecutor(){
-        executor = Executors.newFixedThreadPool(prop.getConfigGroupList().size());
+        if (prop != null && prop.getEnabled())
+            executor = Executors.newFixedThreadPool(prop.getConfigGroupList().size());
     }
 
     @Override

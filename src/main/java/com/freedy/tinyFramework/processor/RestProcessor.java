@@ -264,7 +264,7 @@ public class RestProcessor extends SimpleChannelInboundHandler<FullHttpRequest> 
             //非数组
             if (!paramClazz.isArray()) {
 
-                if (ReflectionUtils.isBasicType(paramClazz)) {
+                if (ReflectionUtils.isRegularType(paramClazz)) {
                     method.setArgument(ReflectionUtils.convertType(httpUrlParameter, paramClazz));
                 } else if (ReflectionUtils.isSonInterface(paramClazz, "java.util.Collection", "java.util.Map")) {
                     throw new UnsupportedOperationException("request param doesn't support Collection type or Map type");
@@ -290,7 +290,7 @@ public class RestProcessor extends SimpleChannelInboundHandler<FullHttpRequest> 
                 Class<?> fieldType = field.getType();
                 field.setAccessible(true);
 
-                if (ReflectionUtils.isBasicType(fieldType)) {
+                if (ReflectionUtils.isRegularType(fieldType)) {
                     String arg = urlParser.getParameter(propName);
                     //属性注入
                     field.set(obj, ReflectionUtils.convertType(arg, fieldType));

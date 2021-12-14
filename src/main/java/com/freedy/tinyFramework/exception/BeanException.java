@@ -25,6 +25,7 @@ public class BeanException extends RuntimeException {
         exceptionMsg.setAccessible(true);
         exceptionMsg.set(this, new PlaceholderParser(msg, placeholder)
                 .configPlaceholderHighLight(PlaceholderParser.PlaceholderHighLight.HIGH_LIGHT_CYAN)
+                .registerNoneHighLightClass(Throwable.class)
                 .toString());
         //设置cause
         for (Object o : placeholder) {

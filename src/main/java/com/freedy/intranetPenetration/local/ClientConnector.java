@@ -2,6 +2,7 @@ package com.freedy.intranetPenetration.local;
 
 import com.freedy.AuthenticAndDecrypt;
 import com.freedy.AuthenticAndEncrypt;
+import com.freedy.EncryptProp;
 import com.freedy.Struct;
 import com.freedy.intranetPenetration.Protocol;
 import com.freedy.tinyFramework.annotation.beanContainer.Inject;
@@ -34,6 +35,8 @@ public class ClientConnector {
     private Map<Struct.ConfigGroup, List<Channel>> remoteChannelMap;
     @Inject
     private BeanFactory factory;
+    @Inject
+    private EncryptProp encryptProp;
 
     /**
      * 连接到远程服务
@@ -48,8 +51,8 @@ public class ClientConnector {
             channel.pipeline().addLast(
                     new LengthFieldBasedFrameDecoder(Integer.MAX_VALUE, 0, 4, 0, 4),
                     new LengthFieldPrepender(4),
-                    new AuthenticAndEncrypt(),
-                    new AuthenticAndDecrypt(Protocol::invokeHandler),
+                    new AuthenticAndEncrypt(encryptProp.getAesKey(),encryptProp.getAuthenticationToken()),
+                    new AuthenticAndDecrypt(encryptProp.getAesKey(),encryptProp.getAuthenticationToken(),Protocol::invokeHandler),
                     new ObjectEncoder(),
                     new ObjectDecoder(ClassResolvers.cacheDisabled(ClientConnector.class.getClassLoader())),
                     new ClientHandshake(group,factory)
