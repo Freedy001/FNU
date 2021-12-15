@@ -11,11 +11,15 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class Token {
-    private String type;
-    private String value;
+public abstract class Token {
+    protected String type;
+    protected String value;
 
     public boolean isType(String type){
         return type.equals(this.type);
+    }
+
+    public boolean isValue(String val){
+        return value.equals(val);
     }
 }

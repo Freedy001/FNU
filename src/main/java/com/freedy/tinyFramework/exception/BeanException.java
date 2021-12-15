@@ -15,6 +15,9 @@ public class BeanException extends RuntimeException {
         super(cause);
     }
 
+    public BeanException(String msg) {
+        super(msg);
+    }
 
     @SneakyThrows
     public BeanException(String msg, Object... placeholder) {

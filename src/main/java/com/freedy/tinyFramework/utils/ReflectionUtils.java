@@ -2,6 +2,7 @@ package com.freedy.tinyFramework.utils;
 
 
 import com.freedy.tinyFramework.exception.BeanInitException;
+import com.freedy.tinyFramework.exception.IllegalArgumentException;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
@@ -40,17 +41,15 @@ public class ReflectionUtils {
             log.debug("invoke " + objectClass.getSimpleName() + "'s getter method===> {}", getterMethodName + "()");
             return objectClass.getMethod(getterMethodName).invoke(object);
         } catch (NoSuchMethodException e) {
-            String getterMethodName = "get" + fieldName;
-            log.warn("getter method invoke fail!change getter name to {}", getterMethodName);
             try {
-                return objectClass.getMethod(getterMethodName).invoke(object);
+                Field field = objectClass.getDeclaredField(fieldName);
+                field.setAccessible(true);
+                return field.get(object);
             } catch (Exception ex) {
-                log.error(e.getClass().getSimpleName() + "===>" + e.getMessage());
-                return null;
+                throw new IllegalArgumentException("get value failed,because ?", ex);
             }
         } catch (Exception e) {
-            log.error(e.getClass().getSimpleName() + "===>" + e.getMessage());
-            return null;
+            throw new IllegalArgumentException("get value failed,because ?", e);
         }
     }
 
@@ -526,6 +525,7 @@ public class ReflectionUtils {
         }
         return null;
     }
+
 
 }
 
