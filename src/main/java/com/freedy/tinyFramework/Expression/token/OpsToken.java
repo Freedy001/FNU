@@ -15,5 +15,4 @@ public class OpsToken extends Token {
     public OpsToken(String type,String value) {
         super(type, value);
     }
-
 }

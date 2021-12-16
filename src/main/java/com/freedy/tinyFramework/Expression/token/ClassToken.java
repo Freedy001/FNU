@@ -11,11 +11,12 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @EqualsAndHashCode(callSuper = true)
-public abstract class ClassToken extends Token{
+public abstract class ClassToken extends Token implements Assignable{
     protected boolean nullCheck;
     protected String propertyName;
     protected String methodName;
     protected String[] methodArgs;
+
 
     public ClassToken(String type, String value) {
         super(type, value);

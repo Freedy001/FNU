@@ -62,29 +62,25 @@ public class ReflectionUtils {
      * @param fieldValue 需要设置的值
      * @return 是否设置成功
      */
-    public static boolean setter(Object object, String fieldName, Object fieldValue) {
+    public static void setter(Object object, String fieldName, Object fieldValue) {
         Class<?> objectClass = object.getClass();
         try {
             String setterMethodName = "set" + fieldName.substring(0, 1).toUpperCase() + fieldName.substring(1);
             log.debug("invoke " + objectClass.getSimpleName() + "'s setter method===> {}", setterMethodName + "(" + fieldValue + ")");
             objectClass.getMethod(setterMethodName, getFieldRecursion(object.getClass(), fieldName).getType()).invoke(object, fieldValue);
-            return true;
         } catch (NoSuchMethodException e) {
-            String setterMethodName = "set" + fieldName;
-            log.warn("setter method invoke fail!change setter name to {}", setterMethodName);
             try {
-                log.debug("invoke " + objectClass.getSimpleName() + "'s setter method===> {}", setterMethodName + "(" + fieldValue + ")");
-                objectClass.getMethod(setterMethodName, getFieldRecursion(object.getClass(), fieldName).getType()).invoke(object, fieldValue);
-                return true;
+                Field field = getFieldRecursion(objectClass, fieldName);
+                field.setAccessible(true);
+                field.set(object, fieldValue);
             } catch (Exception ex) {
-                log.error(e.getClass().getSimpleName() + "===>" + e.getMessage());
-                return false;
+                throw new IllegalArgumentException("set value failed,because ?", ex);
             }
         } catch (Exception e) {
-            log.error(e.getClass().getSimpleName() + "===>" + e.getMessage());
-            return false;
+            throw new IllegalArgumentException("set value failed,because ?", e);
         }
     }
+
 
     /**
      * @param object     需要被设置字段的对象
@@ -422,9 +418,13 @@ public class ReflectionUtils {
      * @return         新collection
      */
     public static Collection<Object> buildCollectionByFiledAndValue(Field field, String[] arg) {
+        return buildCollectionByTypeAndValue(field.getGenericType(),arg);
+    }
+
+    public static Collection<Object> buildCollectionByTypeAndValue(Type type, String[] arg) {
         Collection<Object> collection;
 
-        if (field.getGenericType() instanceof ParameterizedType parameterizedType) {
+        if (type instanceof ParameterizedType parameterizedType) {
             Type[] genericType = parameterizedType.getActualTypeArguments();
             Class<?> listType = (Class<?>) genericType[0];
             Class<?> rawType = (Class<?>) parameterizedType.getRawType();
@@ -437,7 +437,7 @@ public class ReflectionUtils {
         } else {
             //没有声明泛型 默认string
             //创建实例
-            collection = ReflectionUtils.buildCollectionByType(field.getType());
+            collection = ReflectionUtils.buildCollectionByType((Class<?>) type);
             if (arg==null) return collection;
             collection.addAll(Arrays.asList(arg));
         }

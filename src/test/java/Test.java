@@ -1,17 +1,29 @@
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import com.freedy.ServerStarter;
+import lombok.SneakyThrows;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 public class Test {
 
+    private ServerStarter serverStarter=new ServerStarter();
+    private List<Object> serverStarters=new ArrayList<>();
+    @SneakyThrows
     public static void main(String[] args) {
-        Matcher matcher = Pattern.compile("\\{.*?,?.?}")
-                .matcher("{12:21,32:43}");
-        while (matcher.find()) {
-            System.out.println("============group-" + matcher.groupCount() + "-start============");
-            for (int i = 0; i <= matcher.groupCount(); i++) {
-//            System.out.println(Arrays.toString(matcher.group(i).split(",")));
-                System.out.println(matcher.group(i));
-            }
+        Field field = Test.class.getDeclaredField("serverStarters");
+        System.out.println(Arrays.toString(field.getType().getInterfaces()));
+        Type type = field.getGenericType();
+        System.out.println(type.getTypeName());
+        if (type instanceof Class<?> c){
+            System.out.println(Arrays.toString(c.getInterfaces()));
+        }
+        if (type instanceof ParameterizedType parameterizedType){
+            System.out.println(parameterizedType.getActualTypeArguments()[0]);
+            System.out.println(parameterizedType.getRawType());
         }
     }
 }

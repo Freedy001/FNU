@@ -15,11 +15,12 @@ public class TokenStream {
     @Getter
     private final List<Token> infixExpression = new ArrayList<>();
     private final Set<String> doubleOps = Set.of("||", "&&", "!=", "==", ">=", "<=", "++", "--", "+=", "-=");
+    private final Set<String> singleOps = Set.of("++", "--", "!");
     private final List<Set<String>> priorityOps = Arrays.asList(
             Set.of("=", ">", "<", "||", "&&", "==", "!=", ">=", "<="),
             Set.of("+", "-", "+=", "-="),
             Set.of("*", "/"),
-            Set.of("++", "--")
+            singleOps
     );//从上往下 优先级逐渐变大
     @Getter
     private final String expression;
@@ -82,6 +83,7 @@ public class TokenStream {
     // ba2=
     // <=+
     public List<Token> calculateSuffix() {
+        mergeSingleTokenOps();
         List<Token> suffixExpression = new ArrayList<>();
         Stack<Token> opsStack = new Stack<>();
         //扫描中缀
@@ -114,6 +116,59 @@ public class TokenStream {
         return suffixExpression;
     }
 
+
+    private void mergeSingleTokenOps() {
+        for (int i = 0; i < infixExpression.size(); i++) {
+            Token token = infixExpression.get(i);
+            String ops = token.getValue();
+            try {
+                if (token.isType("operation") && singleOps.contains(ops)) {
+                    if ("!".equals(ops)) {
+                        if (i + 1 >= infixExpression.size()) {
+                            ExpressionSyntaxException.tokenThr(expression, token);
+                        }
+                        Token nextToken = infixExpression.get(i + 1);
+                        if (nextToken.isType("operation")) {
+                            ExpressionSyntaxException.tokenThr(expression, token, nextToken);
+                        }
+                        nextToken.setNotFlag(true);
+                        infixExpression.remove(i);
+                    } else {
+                        Token preToken = null;
+                        if (i - 1 >= 0) {
+                            preToken = infixExpression.get(i - 1);
+                        }
+                        Token nextToken = null;
+                        if (i + 1 < infixExpression.size()) {
+                            nextToken = infixExpression.get(i + 1);
+                        }
+                        if (preToken == null || preToken.isType("operation")) {
+                            if (nextToken == null) {
+                                ExpressionSyntaxException.tokenThr(expression, token);
+                            }
+                            assert nextToken != null;
+                            if (ops.equals("++"))
+                                nextToken.setPreSelfAddFlag(true);
+                            else
+                                nextToken.setPreSelfSubFlag(true);
+                            infixExpression.remove(i);
+                            continue;
+                        }
+                        if (nextToken == null || nextToken.isType("operation")) {
+                            if (ops.equals("++"))
+                                preToken.setPostSelfAddFlag(true);
+                            else
+                                preToken.setPostSelfSubFlag(true);
+                            infixExpression.remove(i);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                ExpressionSyntaxException.tokenThr(e.getMessage(), expression, token);
+            }
+        }
+
+    }
 
     public Token getToken(int index) {
         return infixExpression.get(index);

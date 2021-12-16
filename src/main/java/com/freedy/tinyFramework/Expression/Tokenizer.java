@@ -3,8 +3,8 @@ package com.freedy.tinyFramework.Expression;
 import com.alibaba.fastjson.JSON;
 import com.freedy.tinyFramework.Expression.token.*;
 import com.freedy.tinyFramework.exception.ExpressionSyntaxException;
-import com.freedy.tinyFramework.exception.IllegalArgumentException;
 import com.freedy.tinyFramework.utils.StringUtils;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -14,6 +14,7 @@ import java.util.regex.Pattern;
  * @author Freedy
  * @date 2021/12/14 15:28
  */
+@Slf4j
 public class Tokenizer {
 
     //                                                  T  (java.lang.Math) . ?  pow      (  3 ,    2 )
@@ -29,6 +30,8 @@ public class Tokenizer {
 
     private final Pattern numeric = Pattern.compile("\\d+|\\d+[lL]");
 
+    private final Pattern bool = Pattern.compile("true|false");
+
     private final Pattern methodPattern = Pattern.compile("(.*?)\\((.*?)\\)");
     //                                              T  (java.lang.Math) . ?  pow      (  3 ,    2 )
     private final Pattern expressionBracket = Pattern.compile(".*?T *?\\($|.*?\\..*?\\w+ *?\\($");
@@ -42,39 +45,7 @@ public class Tokenizer {
     private final Set<Character> bracket = Set.of('(', ')');
 
 
-    public static void main(String[] args) {
-        TokenStream stream = new Tokenizer().getTokenStream(
-                "#test.enabled=(T(com.freedy.Context).INTRANET_CHANNEL_RETRY_TIMES==#localProp.enabled)>{1,2,3,4,5}[0]");
-        for (Token token : stream.getInfixExpression()) {
-            System.out.println(JSON.toJSONString(token));
-        }
-        stream.calculateSuffix();
-        System.out.println("==================================");
-        for (Token token : stream.calculateSuffix()) {
-            System.out.println(JSON.toJSONString(token));
-        }
-    }
 
-    /*
-      true
-      false
-      #test.srt++*2 =='abc'
-      #test.val>2+3+2*5-T(java.util.Math).pow(3,2)
-      #test.enabled=(T(com.freedy.Context).INTRANET_CHANNEL_RETRY_TIMES==#localProp.enabled)>{1,2,3,4,5}[0]
-      T(com.freedy.Context).test()
-      #localProp.enabled
-      #localProp.init()
-      #localProp?.enabled
-      #localProp?.init()
-      [[1],[22,3,4],[3],[4],[5]][1]=[1]
-      {'k1':'123','k2':'321'}
-      =
-      ==
-      <
-      >
-      ||
-      &&
-    */
     public TokenStream getTokenStream(String expression) {
         expression = expression.replaceAll("\r\n|\n", " ");
         TokenStream tokenStream = new TokenStream(expression);
@@ -145,7 +116,10 @@ public class Tokenizer {
             ExpressionSyntaxException.thr(expression,token);
         }
 
-
+        log.debug("resolve expression over,blew is tokenStream");
+        for (Token t : tokenStream.getInfixExpression()) {
+            System.out.println(JSON.toJSONString(t));
+        }
         return tokenStream;
     }
 
@@ -158,7 +132,7 @@ public class Tokenizer {
         if (matcher.find()) {
             StaticToken staticToken = new StaticToken(token);
             if (!matcher.group(1).trim().equals("T")) {
-                throw new IllegalArgumentException("illegal expression ?,please check ? part", token, matcher.group(1));
+                return true;
             }
             staticToken.setOpsClass(matcher.group(2).trim());
             staticToken.setNullCheck(matcher.group(3).equals("?"));
@@ -167,7 +141,8 @@ public class Tokenizer {
             if (matcher.find()) {
                 //method
                 staticToken.setMethodName(matcher.group(1).trim());
-                staticToken.setMethodArgs(matcher.group(2).split(","));
+                String group = matcher.group(2);
+                staticToken.setMethodArgs(StringUtils.hasText(group)?group.split(","):new String[0]);
             } else {
                 staticToken.setPropertyName(propOrMethod);
             }
@@ -177,7 +152,7 @@ public class Tokenizer {
         matcher = referencePattern.matcher(token);
         if (matcher.find()) {
             if (!matcher.group(1).trim().equals("#")) {
-                throw new IllegalArgumentException("illegal expression ?,please check ? part", token, matcher.group(1));
+                return true;
             }
             ReferenceToken referenceToken = new ReferenceToken(token);
             referenceToken.setReferenceName(matcher.group(2).trim());
@@ -187,7 +162,8 @@ public class Tokenizer {
             if (matcher.find()) {
                 //method
                 referenceToken.setMethodName(matcher.group(1).trim());
-                referenceToken.setMethodArgs(matcher.group(2).split(","));
+                String group = matcher.group(2);
+                referenceToken.setMethodArgs(StringUtils.hasText(group)?group.split(","):new String[0]);
             } else {
                 referenceToken.setPropertyName(propOrMethod);
             }
@@ -197,7 +173,8 @@ public class Tokenizer {
         matcher = collectionPattern.matcher(token);
         if (matcher.find()) {
             CollectionToken collectionToken = new CollectionToken(token);
-            collectionToken.setElements(matcher.group(1).split(","));
+            String group = matcher.group(1);
+            collectionToken.setElements(StringUtils.hasText(group)?group.split(","):new String[0]);
             collectionToken.setRelevantOpsName(matcher.group(2));
             tokenStream.addToken(collectionToken);
             return false;
@@ -219,6 +196,12 @@ public class Tokenizer {
         matcher = strPattern.matcher(token);
         if (matcher.find()) {
             BasicVarToken numeric = new BasicVarToken("str", matcher.group(1));
+            tokenStream.addToken(numeric);
+            return false;
+        }
+        matcher = bool.matcher(token);
+        if (matcher.matches()) {
+            BasicVarToken numeric = new BasicVarToken("bool", token);
             tokenStream.addToken(numeric);
             return false;
         }

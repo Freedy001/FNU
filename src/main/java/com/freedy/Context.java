@@ -24,4 +24,14 @@ public class Context {
     public final static int CMD_LENGTH = 28;
     //换行符
     public final static String LF = System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("win") ? "\r\n" : "\n";
+
+
+
+
+    public static int TEST = 28;
+
+    public static Object test(){
+        System.out.println("hello");
+        return "你好";
+    }
 }

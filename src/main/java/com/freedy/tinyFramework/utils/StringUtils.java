@@ -21,6 +21,19 @@ public class StringUtils {
         return s == null || s.equals("");
     }
 
+    public static boolean hasAnyText(String... s) {
+        for (String s1 : s) {
+            if (hasText(s1)) return true;
+        }
+        return false;
+    }
+
+    public static boolean isAnyEmpty(String... s) {
+        for (String s1 : s) {
+            if (isEmpty(s1)) return true;
+        }
+        return false;
+    }
 
     private static String getUrl(String rawUrl) {
         rawUrl = rawUrl.trim();
