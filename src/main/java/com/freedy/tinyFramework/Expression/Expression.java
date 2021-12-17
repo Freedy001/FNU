@@ -1,5 +1,6 @@
 package com.freedy.tinyFramework.Expression;
 
+import com.alibaba.fastjson.JSON;
 import com.freedy.tinyFramework.Expression.token.Assignable;
 import com.freedy.tinyFramework.Expression.token.BasicVarToken;
 import com.freedy.tinyFramework.Expression.token.Token;
@@ -45,7 +46,10 @@ public class Expression {
 
 
     private Object evaluate(Class<?> desired, EvaluationContext context) {
+        stream.setEachTokenContext(context);
         List<Token> tokenList = stream.calculateSuffix();
+        System.out.println("\n");
+        tokenList.forEach(item -> System.out.println(JSON.toJSONString(item)));
         Stack<Token> varStack = new Stack<>();
         List<Token> list = new ArrayList<>();
         for (Token token : tokenList) {
@@ -54,7 +58,7 @@ public class Expression {
                     list.add(token);
                     Token token1 = varStack.pop();
                     Token token2 = varStack.pop();
-                    varStack.push(doEvaluate(token.getValue(),token2, token1));
+                    varStack.push(doEvaluate(token, token2, token1));
                     continue;
                 }
                 varStack.push(token);
@@ -71,11 +75,11 @@ public class Expression {
             Object result = null;
             try {
                 result = token.calculateResult(desired);
-            }catch (ExpressionSyntaxException e){
+            } catch (ExpressionSyntaxException e) {
                 throw e;
-            }catch (EvaluateException e){
+            } catch (EvaluateException e) {
                 ExpressionSyntaxException.thrEvaluateException(e, expression, token);
-            }catch (Exception e) {
+            } catch (Exception e) {
                 ExpressionSyntaxException.tokenThr(e, expression, token);
             }
             return result;
@@ -85,56 +89,23 @@ public class Expression {
     }
 
 
-    private Token doEvaluate(String ops,Token t1,Token t2) {
-        switch (ops) {
+    private Token doEvaluate(Token opsToken, Token t1, Token t2) {
+        switch (opsToken.getValue()) {
             case "=" -> {
                 return assign(t1, t2);
             }
-            case "<" -> {
-                return compare(t1, t2, "<");
+            case "||", "&&" -> {
+                return logicOps(t1, t2, opsToken);
             }
-            case ">" -> {
-                return compare(t1, t2, ">");
+            //比较运输
+            case "<", "==", ">=", "<=", ">", "!=" -> {
+                return compare(t1, t2, opsToken);
             }
-            case "<=" -> {
-                return compare(t1, t2, "<=");
+            //数字原始
+            case "+", "/=", "*=", "-=", "+=", "/", "*", "-" -> {
+                return numOps(t1, t2, opsToken);
             }
-            case ">=" -> {
-                return compare(t1, t2, ">=");
-            }
-            case "==" -> {
-                return compare(t1, t2, "==");
-            }
-            case "!=" -> {
-                return compare(t1, t2, "!=");
-            }
-            case "||" -> {
-                return or(t1, t2);
-            }
-            case "&&" -> {
-                return and(t1, t2);
-            }
-            case "+" -> {
-                return numOps(t1, t2, "+");
-            }
-            case "-" -> {
-                return numOps(t1, t2, "-");
-            }
-            case "*" -> {
-                return numOps(t1, t2, "*");
-            }
-            case "/" -> {
-                return numOps(t1, t2, "/");
-            }
-            case "+=" -> {
-                return numOps(t1, t2, "+=");
-            }
-            case "-=" -> {
-                return numOps(t1, t2, "-=");
-            }
-            default -> {
-                throw new EvaluateException("unrecognized ops ?", ops);
-            }
+            default -> throw new EvaluateException("unrecognized ops ?", opsToken.getValue());
         }
     }
 
@@ -148,41 +119,38 @@ public class Expression {
         return t1;
     }
 
+    private Token logicOps(Token t1, Token t2, Token ops) {
+        return new BasicVarToken("bool", t1.logicOps(t2, ops.getValue()) + "").setOriginToken(t1, ops, t2).setOffset(t1.getOffset());
+    }
 
-    private Token compare(Token t1, Token t2, String type) {
-        switch (type) {
+
+    private Token compare(Token t1, Token t2, Token ops) {
+        switch (ops.getValue()) {
             case "<" -> {
-                return new BasicVarToken("bool", (t1.compareTo(t2) < 0) + "");
+                return new BasicVarToken("bool", (t1.compareTo(t2) < 0) + "").setOriginToken(t1, ops, t2).setOffset(t1.getOffset());
             }
             case ">" -> {
-                return new BasicVarToken("bool", (t1.compareTo(t2) > 0) + "");
+                return new BasicVarToken("bool", (t1.compareTo(t2) > 0) + "").setOriginToken(t1, ops, t2).setOffset(t1.getOffset());
             }
             case "<=" -> {
-                return new BasicVarToken("bool", (t1.compareTo(t2) <= 0) + "");
+                return new BasicVarToken("bool", (t1.compareTo(t2) <= 0) + "").setOriginToken(t1, ops, t2).setOffset(t1.getOffset());
             }
             case ">=" -> {
-                return new BasicVarToken("bool", (t1.compareTo(t2) >= 0) + "");
+                return new BasicVarToken("bool", (t1.compareTo(t2) >= 0) + "").setOriginToken(t1, ops, t2).setOffset(t1.getOffset());
             }
             case "==" -> {
-                return new BasicVarToken("bool", (t1.compareTo(t2) == 0) + "");
+                return new BasicVarToken("bool", (t1.compareTo(t2) == 0) + "").setOriginToken(t1, ops, t2).setOffset(t1.getOffset());
             }
             case "!=" -> {
-                return new BasicVarToken("bool", (t1.compareTo(t2) != 0) + "");
+                return new BasicVarToken("bool", (t1.compareTo(t2) != 0) + "").setOriginToken(t1, ops, t2).setOffset(t1.getOffset());
             }
-            default -> throw new EvaluateException("unrecognized type ?", type);
+            default -> throw new EvaluateException("unrecognized type ?", ops.getValue());
         }
     }
 
-    private Token or(Token t1, Token t2) {
-        return new BasicVarToken("bool", t1.logicOps(t2, "||") + "");
-    }
 
-    private Token and(Token t1, Token t2) {
-        return new BasicVarToken("bool", t1.logicOps(t2, "&&") + "");
-    }
-
-    private Token numOps(Token t1, Token t2, String type) {
-        return new BasicVarToken("numeric", t1.numOps(t2, type) + "");
+    private Token numOps(Token t1, Token t2, Token ops) {
+        return new BasicVarToken("numeric", t1.numSelfOps(t2, ops.getValue())).setOriginToken(t1, ops, t2).setOffset(t1.getOffset());
     }
 
 

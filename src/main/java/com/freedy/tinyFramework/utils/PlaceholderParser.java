@@ -193,7 +193,7 @@ public class PlaceholderParser {
                 setEnd("\033[0;39m");
             }
             case HIGH_LIGHT_YELLOW -> {
-                setStart("\033[33m");
+                setStart("\033[93m");
                 setEnd("\033[0;39m");
             }
         }

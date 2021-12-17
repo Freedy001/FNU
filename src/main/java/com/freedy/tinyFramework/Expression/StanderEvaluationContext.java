@@ -4,7 +4,6 @@ import com.freedy.tinyFramework.exception.IllegalArgumentException;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
@@ -40,15 +39,9 @@ public class StanderEvaluationContext implements EvaluationContext {
     @Override
     public Object getVariable(String name) {
         try {
-            if (name.contains("#")) {
-                return variableMap.get(name);
-            } else {
-                Field field = root.getClass().getDeclaredField(name);
-                field.setAccessible(true);
-                return field.get(root);
-            }
+            return variableMap.get(name);
         } catch (Exception e) {
-            throw new IllegalArgumentException("get variable ? failed,because ?", e);
+            throw new IllegalArgumentException("get variable ? failed,because ?",name, e);
         }
     }
 

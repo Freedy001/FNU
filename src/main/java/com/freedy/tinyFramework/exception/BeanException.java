@@ -36,6 +36,7 @@ public class BeanException extends RuntimeException {
                 Field cause = aClass.getDeclaredField("cause");
                 cause.setAccessible(true);
                 cause.set(this, o);
+                break;
             }
         }
     }

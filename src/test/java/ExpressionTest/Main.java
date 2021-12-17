@@ -1,11 +1,12 @@
 package ExpressionTest;
 
-import com.freedy.Context;
 import com.freedy.tinyFramework.Expression.Expression;
 import com.freedy.tinyFramework.Expression.ExpressionPasser;
 import com.freedy.tinyFramework.Expression.StanderEvaluationContext;
+import com.freedy.tinyFramework.utils.PlaceholderParser;
 
 import java.util.StringJoiner;
+import java.util.function.Supplier;
 
 /**
  * @author Freedy
@@ -15,10 +16,12 @@ public class Main {
 
     public static ExpressionPasser passer = new ExpressionPasser();
     public static StanderEvaluationContext context = new StanderEvaluationContext(new TestClass());
+    private static TestClass test = new TestClass();
+    private static TestClass2 class2 = new TestClass2();
 
     static {
-        context.setVariable("test", new TestClass());
-        context.setVariable("class", new TestClass2());
+        context.setVariable("test", test);
+        context.setVariable("class2", class2);
     }
 
     /*
@@ -41,27 +44,60 @@ public class Main {
       ||
       &&
     */
-    public static void main(String[] args) {
+    public static void main(String[] args) throws InterruptedException {
 
-        evaluate("T(ExpressionTest.TestClass).NAME");
-        evaluate("T(ExpressionTest.TestClass).NAME='haha'",TestClass.NAME);
-        evaluate("T(ExpressionTest.TestClass).AGE++",TestClass.AGE);
-        evaluate("!T(ExpressionTest.TestClass).IF",TestClass.IF);
-        evaluate("!T(ExpressionTest.TestClass).prsf()",TestClass.prsf());
-        evaluate("#test.age++");
-        evaluate("#test.name");
+//        evaluate("T(ExpressionTest.TestClass).NAME");
+//        evaluate("T(ExpressionTest.TestClass).NAME='haha'",()->TestClass.NAME);
+//        evaluate("T(ExpressionTest.TestClass).AGE++",()->TestClass.AGE);
+//        evaluate("T(ExpressionTest.TestClass).AGE--",()->TestClass.AGE);
+//        evaluate("++T(ExpressionTest.TestClass).AGE",()->TestClass.AGE);
+//        evaluate("--T(ExpressionTest.TestClass).AGE",()->TestClass.AGE);
+//
+//        evaluate("!T(ExpressionTest.TestClass).IF",()->TestClass.IF);
+//        evaluate("T(ExpressionTest.TestClass).prsf()='gaga'", TestClass::prsf);
+//
+//        evaluate("#test.age+=100",()->test.getAge());
+//        evaluate("++#test.age",()->test.getAge());
+//        evaluate("#test.age/=1000",()->test.getAge());
+//        evaluate("--#test.age",()->test.getAge());
+//        //100+102
+//        evaluate("#test.age++ + ++#test.age", () -> test.getAge());
+//        //102+102
+//        evaluate("#test.age++ + --#test.age", () -> test.getAge());
+//        //102+102
+//        evaluate("#test.age-- + ++#test.age", () -> test.getAge());
+//        //102+100
+//        evaluate("#test.age-- + --#test.age", () -> test.getAge());
+//
+//        evaluate("#test.age++ - ++#test.age", () -> test.getAge());
+//        evaluate("#test.age++ - --#test.age", () -> test.getAge());
+//        evaluate("#test.age-- - ++#test.age", () -> test.getAge());
+//        evaluate("#test.age-- - --#test.age", () -> test.getAge());
+//        evaluate("#test.name='nihao'",()->test.getName());
 
-
-        System.out.println(Context.TEST);
+//        evaluate("#test._if=(!T(ExpressionTest.TestClass).IF||#test._if&&false)", () -> test.is_if());
+//        evaluate("#test._if = (3+5>23 && 5*9<4)", () -> test.getName());
+        evaluate("55+55>55 && 55*55<55", () -> test.getName());
     }
 
-    public static void evaluate(String expression,Object ...relevantStr) {
-        Expression ex = passer.parseExpression(expression);
-        System.out.println(ex.getValue(context));
-        StringJoiner joiner = new StringJoiner(",", "(", ")");
-        for (Object s : relevantStr) {
-            joiner.add(String.valueOf(s));
+    @SafeVarargs
+    public static void evaluate(String expression, Supplier<Object>... suppliers) throws InterruptedException {
+        try {
+            StringJoiner joiner = new StringJoiner(",", "(", ")");
+            for (Supplier<Object> supplier : suppliers) {
+                joiner.add(String.valueOf(supplier.get()));
+            }
+            System.out.println(new PlaceholderParser("?", "======>relevant expression>>>>>>>>" + expression + "======>relevantStr>>>>>>>>>>>>>>>>>" + joiner + ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>").configPlaceholderHighLight(PlaceholderParser.PlaceholderHighLight.HIGH_LIGHT_CYAN));
+            Expression ex = passer.parseExpression(expression);
+            System.out.println(new PlaceholderParser("?", ex.getValue(context)).configPlaceholderHighLight(PlaceholderParser.PlaceholderHighLight.HIGH_LIGHT_YELLOW));
+            joiner = new StringJoiner(",", "(", ")");
+            for (Supplier<Object> supplier : suppliers) {
+                joiner.add(String.valueOf(supplier.get()));
+            }
+            System.out.println(new PlaceholderParser("?", "======>relevantStr>>>>>>>>>>>>>>>>>" + joiner + ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n\n").configPlaceholderHighLight(PlaceholderParser.PlaceholderHighLight.HIGH_LIGHT_CYAN));
+        } catch (Exception e) {
+            e.printStackTrace();
+            Thread.sleep(1000);
         }
-        System.out.println("======>relevantStr>>>>>>>>>>>>>>>>>"+joiner+">>>>>>>>>>>>>>>>>");
     }
 }

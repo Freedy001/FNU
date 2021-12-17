@@ -18,7 +18,7 @@ import java.util.regex.Pattern;
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
-@JSONType(ignores = {"numeric","strPattern","context","desiredType","notFlag","preSelfAddFlag","preSelfSubFlag","postSelfAddFlag","postSelfSubFlag"})
+@JSONType(includes = {"type","value"})
 public class CollectionToken extends Token {
     private String[] elements;
     private String relevantOpsName;

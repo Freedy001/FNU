@@ -26,11 +26,11 @@ import java.util.regex.Pattern;
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
-@JSONType(ignores = {"numeric","strPattern","context","desiredType","notFlag","preSelfAddFlag","preSelfSubFlag","postSelfAddFlag","postSelfSubFlag"})
+@JSONType(includes = {"type","value"})
 public class MapToken extends Token {
     private String mapStr;
     private String relevantOpsName;
-    private Pattern strPattern = Pattern.compile("^'(.*?)'$");
+    private final Pattern strPattern = Pattern.compile("^'(.*?)'$");
 
     public MapToken(String value) {
         super("map", value);

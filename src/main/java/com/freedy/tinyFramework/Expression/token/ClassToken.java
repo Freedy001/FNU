@@ -1,8 +1,11 @@
 package com.freedy.tinyFramework.Expression.token;
 
+import com.freedy.tinyFramework.utils.StringUtils;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+
+import java.util.StringJoiner;
 
 /**
  * @author Freedy
@@ -20,6 +23,16 @@ public abstract class ClassToken extends Token implements Assignable{
 
     public ClassToken(String type, String value) {
         super(type, value);
+    }
+
+
+    public String getMethodStr(){
+        if (StringUtils.isEmpty(methodName)) return null;
+        StringJoiner joiner = new StringJoiner(",", "(", ")");
+        for (String methodArg : methodArgs) {
+            joiner.add(methodArg);
+        }
+        return methodName+ joiner;
     }
 
 }

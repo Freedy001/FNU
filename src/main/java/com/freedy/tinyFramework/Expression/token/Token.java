@@ -1,14 +1,19 @@
 package com.freedy.tinyFramework.Expression.token;
 
+import com.alibaba.fastjson.annotation.JSONType;
 import com.freedy.tinyFramework.Expression.EvaluationContext;
 import com.freedy.tinyFramework.exception.EvaluateException;
 import com.freedy.tinyFramework.exception.UnsupportedOperationException;
+import com.freedy.tinyFramework.utils.ReflectionUtils;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.*;
 
 /**
  * @author Freedy
@@ -17,9 +22,15 @@ import java.lang.reflect.Type;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@JSONType(includes = {"type", "value"})
 public abstract class Token implements Comparable<Token> {
     protected String type;
     protected String value;
+    //获取原始token 表示此token是由原始token计算而来
+    protected List<Token> originToken;
+    //获取子token ,其子token是有该token与其他token计算而来
+    protected Token sonToken;
+    protected int offset;
     protected EvaluationContext context;
     //非门标记       ! a
     protected boolean notFlag = false;
@@ -34,17 +45,11 @@ public abstract class Token implements Comparable<Token> {
 
     protected Class<?> desiredType;
 
+    public final static Class<Object> ANY_TYPE = Object.class;
+
     public Token(String type, String value) {
         this.type = type;
         this.value = value;
-    }
-
-
-    public boolean isAnyType(String... type) {
-        for (String s : type) {
-            if (isType(s)) return true;
-        }
-        return false;
     }
 
     public boolean isType(String type) {
@@ -55,6 +60,48 @@ public abstract class Token implements Comparable<Token> {
         return value.equals(val);
     }
 
+    public boolean isAnyType(String... type) {
+        for (String s : type) {
+            if (isType(s)) return true;
+        }
+        return false;
+    }
+
+    public boolean isAnyValue(String... type) {
+        for (String s : type) {
+            if (isValue(s)) return true;
+        }
+        return false;
+    }
+
+    public Token setOriginToken(Token... token) {
+        if (originToken == null) {
+            originToken = new ArrayList<>();
+        }
+        originToken.addAll(Arrays.asList(token));
+        return this;
+    }
+
+
+    public Token setOffset(int offset){
+        this.offset=offset;
+        return this;
+    }
+
+    public List<Token> getMostOriginToken() {
+        if (originToken == null) return new ArrayList<>(List.of(this));
+        Queue<Token> queue = new LinkedList<>(originToken);
+        ArrayList<Token> result = new ArrayList<>();
+        while (!queue.isEmpty()) {
+            Token poll = queue.poll();
+            if (poll.originToken != null) {
+                queue.addAll(poll.originToken);
+            } else {
+                result.add(poll);
+            }
+        }
+        return result;
+    }
 
     @SuppressWarnings("ConstantConditions")
     public int compareTo(Token o) {
@@ -80,12 +127,12 @@ public abstract class Token implements Comparable<Token> {
         try {
             a = (boolean) calculateResult(Boolean.class);
         } catch (Exception e) {
-            throw new EvaluateException("incomparable token,cause ?", e).errToken(this).errStr(type).errToken(this);
+            throw new EvaluateException("incomparable token", e).errToken(this).errStr(type).errToken(o);
         }
         try {
             b = (boolean) o.calculateResult(Boolean.class);
         } catch (Exception e) {
-            throw new EvaluateException("incomparable token,cause ?", e).errToken(this).errStr(type).errToken(this);
+            throw new EvaluateException("incomparable token", e).errToken(this).errStr(type).errToken(o);
         }
         switch (type) {
             case "||" -> {
@@ -98,50 +145,65 @@ public abstract class Token implements Comparable<Token> {
         }
     }
 
-    @SuppressWarnings("ConstantConditions")
-    public double numOps(Token o, String type) {
-        double a;
-        double b;
+
+    public String numSelfOps(Token o, String type) {
+        BigDecimal a;
+        BigDecimal b;
         try {
-            a = (Double) calculateResult(Boolean.class);
+            a = new BigDecimal(calculateResult(Number.class) + "");
         } catch (Exception e) {
             throw new EvaluateException("incomparable token,cause ?", e).errToken(this).errStr(type).errToken(this);
         }
         try {
-            b = (Double) o.calculateResult(Boolean.class);
+            b = new BigDecimal(o.calculateResult(Number.class) + "");
         } catch (Exception e) {
             throw new EvaluateException("incomparable token,cause ?", e).errToken(this).errStr(type).errToken(this);
         }
         switch (type) {
             case "+" -> {
-                return a + b;
+                return a.add(b).toString();
             }
             case "-" -> {
-                return a - b;
+                return a.subtract(b).toString();
             }
             case "*" -> {
-                return a * b;
+                return a.multiply(b).toString();
             }
             case "/" -> {
-                return a / b;
+                //scale 必须超出double的范畴
+                return a.divide(b, 20, RoundingMode.DOWN).toString();
             }
             case "+=" -> {
-                double v = a + b;
                 if (this instanceof Assignable assignable) {
-                    assignable.assignFrom(new BasicVarToken("numeric", v + ""));
+                    assignable.assignFrom(new BasicVarToken("numeric", a.add(b) + ""));
+                    return calculateResult(ANY_TYPE) + "";
                 } else {
                     throw new EvaluateException("nonassignable token").errToken(this).errStr(type).errToken(this);
                 }
-                return v;
             }
             case "-=" -> {
-                double v = a - b;
                 if (this instanceof Assignable assignable) {
-                    assignable.assignFrom(new BasicVarToken("numeric", v + ""));
+                    assignable.assignFrom(new BasicVarToken("numeric", a.subtract(b) + ""));
+                    return calculateResult(ANY_TYPE) + "";
                 } else {
                     throw new EvaluateException("nonassignable token").errToken(this).errStr(type).errToken(this);
                 }
-                return v;
+            }
+            case "/=" -> {
+                if (this instanceof Assignable assignable) {
+                    assignable.assignFrom(new BasicVarToken("numeric", a.divide(b, 20, RoundingMode.DOWN) + ""));
+                    return calculateResult(ANY_TYPE) + "";
+                } else {
+                    throw new EvaluateException("nonassignable token").errToken(this).errStr(type).errToken(this);
+                }
+            }
+            case "*=" -> {
+                if (this instanceof Assignable assignable) {
+                    assignable.assignFrom(new BasicVarToken("numeric", a.multiply(b) + ""));
+                    return calculateResult(ANY_TYPE) + "";
+                } else {
+                    throw new EvaluateException("nonassignable token").errToken(this).errStr(type).errToken(this);
+                }
             }
             default -> throw new EvaluateException("unrecognized type ?", type).errStr(type);
         }
@@ -159,58 +221,58 @@ public abstract class Token implements Comparable<Token> {
         return null;
     }
 
-    protected void checkSetSingleOps() {
+    protected void checkSetSingleOps(String currentOps, boolean isPost) {
         if (notFlag || preSelfAddFlag || preSelfSubFlag || postSelfAddFlag || postSelfSubFlag)
             throw new EvaluateException("has already set single ops ?", notFlag ? "!" : preSelfAddFlag ? "++a" : preSelfSubFlag ? "--a" : postSelfAddFlag ? "a++" : "a--")
-                    .errStr(notFlag ? "!" + value : preSelfAddFlag ? "++" + value : preSelfSubFlag ? "--" + value : postSelfAddFlag ? value + "++" : value + "--");
+                    .errStr(isPost ? value + "@" + currentOps : currentOps + "$" + value);
     }
 
     public void setNotFlag(boolean notFlag) {
-        checkSetSingleOps();
+        checkSetSingleOps("!", false);
         try {
             calculateResult(Boolean.class);
         } catch (Exception e) {
-            throw new EvaluateException("NOT OPS are not support").errStr("!" + value);
+            throw new EvaluateException("NOT OPS are not support", e).errStr("!$" + value);
         }
         this.notFlag = notFlag;
     }
 
     public void setPreSelfAddFlag(boolean preSelfAddFlag) {
-        checkSetSingleOps();
+        checkSetSingleOps("++", false);
         try {
             calculateResult(Integer.class);
         } catch (Exception e) {
-            throw new EvaluateException("NOT OPS are not support").errStr("++" + value);
+            throw new EvaluateException("++a OPS are not support", e).errStr("++" + value);
         }
         this.preSelfAddFlag = preSelfAddFlag;
     }
 
     public void setPreSelfSubFlag(boolean preSelfSubFlag) {
-        checkSetSingleOps();
+        checkSetSingleOps("--", false);
         try {
             calculateResult(Integer.class);
         } catch (Exception e) {
-            throw new EvaluateException("NOT OPS are not support").errStr("--" + value);
+            throw new EvaluateException("--a OPS are not support", e).errStr("--" + value);
         }
         this.preSelfSubFlag = preSelfSubFlag;
     }
 
     public void setPostSelfAddFlag(boolean postSelfAddFlag) {
-        checkSetSingleOps();
+        checkSetSingleOps("++", true);
         try {
             calculateResult(Integer.class);
         } catch (Exception e) {
-            throw new EvaluateException("NOT OPS are not support").errStr(value + "++");
+            throw new EvaluateException("a++ OPS are not support", e).errStr(value + "++");
         }
         this.postSelfAddFlag = postSelfAddFlag;
     }
 
     public void setPostSelfSubFlag(boolean postSelfSubFlag) {
-        checkSetSingleOps();
+        checkSetSingleOps("--", true);
         try {
             calculateResult(Integer.class);
         } catch (Exception e) {
-            throw new EvaluateException("NOT OPS are not support").errStr(value + "--");
+            throw new EvaluateException("a-- OPS are not support,cause ?", e).errStr(value + "--");
         }
         this.postSelfSubFlag = postSelfSubFlag;
     }
@@ -228,10 +290,14 @@ public abstract class Token implements Comparable<Token> {
             throw new EvaluateException("can not evaluate,because evaluationContext is null");
     }
 
-    protected Object checkAndSelfOps(Object result) {
-        if (!desiredType.isInstance(result)) {
+    protected Object check(Object result) {
+        if (!ReflectionUtils.convertToWrapper(desiredType).isInstance(result)) {
             throw new EvaluateException("unmatched type! real type ? desired type ?", result.getClass().getName(), desiredType.getName());
         }
+        return result;
+    }
+
+    protected Object selfOps(Object result) {
         if (notFlag) {
             if (result instanceof Boolean r) {
                 return !r;
@@ -239,21 +305,25 @@ public abstract class Token implements Comparable<Token> {
             throw new EvaluateException("NOT OPS on none boolean type ?", result.getClass().getName());
         }
         if (postSelfAddFlag) { //a++
-            return numOps(result, 1, true);
+            return numSelfOps(result, 1, true);
         }
         if (postSelfSubFlag) { //a--
-            return numOps(result, -1, true);
+            return numSelfOps(result, -1, true);
         }
         if (preSelfAddFlag) { //++a
-            return numOps(result, 1, false);
+            return numSelfOps(result, 1, false);
         }
         if (preSelfSubFlag) { //--a
-            return numOps(result, -1, false);
+            return numSelfOps(result, -1, false);
         }
         return result;
     }
 
-    private Object numOps(Object result, int num, boolean isPost) {
+    protected Object checkAndSelfOps(Object result) {
+        return selfOps(check(result));
+    }
+
+    private Object numSelfOps(Object result, int num, boolean isPost) {
         if (result instanceof Number n) {
             Number add = add(n, num);
             if (this instanceof Assignable assignable) {

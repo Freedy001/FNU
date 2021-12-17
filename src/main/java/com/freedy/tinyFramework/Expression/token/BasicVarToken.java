@@ -8,7 +8,7 @@ import com.freedy.tinyFramework.exception.IllegalArgumentException;
  * @author Freedy
  * @date 2021/12/15 16:50
  */
-@JSONType(ignores = {"numeric","strPattern","context","desiredType","notFlag","preSelfAddFlag","preSelfSubFlag","postSelfAddFlag","postSelfSubFlag"})
+@JSONType(includes = {"type","value"})
 public class BasicVarToken extends Token {
 
     public BasicVarToken(String type, String value) {
@@ -23,13 +23,18 @@ public class BasicVarToken extends Token {
         }
         if (isType("numeric")) { //int long
             if (desiredType.getName().matches("java\\.lang\\.Integer|int")) {
-                return Integer.parseInt(value);
+                return selfOps(Double.valueOf(value).intValue());
             }
             if (desiredType.getName().matches("java\\.lang\\.Long|long")) {
-                return Long.parseLong(value);
+                return selfOps(Double.valueOf(value).longValue());
             }
-            boolean isLong = value.contains("l") || value.contains("L");
-            return checkAndSelfOps(isLong ? Long.parseLong(value) :Integer.parseInt(value));
+            if (value.contains(".")) {
+                return Double.parseDouble(value);
+            } else if (value.contains("l") || value.contains("L")) {
+                return checkAndSelfOps(Long.parseLong(value));
+            } else {
+                return checkAndSelfOps(Integer.parseInt(value));
+            }
         }
         if (isType("bool")) {
             return checkAndSelfOps(notFlag != Boolean.parseBoolean(value));

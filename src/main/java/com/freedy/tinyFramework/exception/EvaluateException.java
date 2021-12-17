@@ -14,7 +14,8 @@ public class EvaluateException extends BeanException {
 
     @Getter
     private final List<String> syntaxErrSubStrList =new ArrayList<>();
-
+    @Getter
+    private final List<Token> tokenList=new ArrayList<>();
 
     public EvaluateException(String msg) {
         super(msg);
@@ -28,8 +29,10 @@ public class EvaluateException extends BeanException {
         this.syntaxErrSubStrList.add(syntaxErrSubStr);
         return this;
     }
-    public EvaluateException errToken(Token syntaxErrSubStr){
-        this.syntaxErrSubStrList.add(syntaxErrSubStr.getValue());
+
+
+    public EvaluateException errToken(Token syntaxErrSubStr) {
+        tokenList.add(syntaxErrSubStr);
         return this;
     }
 

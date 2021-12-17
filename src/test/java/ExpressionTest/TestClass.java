@@ -12,8 +12,9 @@ public class TestClass {
     public static int AGE=12;
     public static boolean IF=false;
 
-    private int age=0;
+    private int age=100;
     private String name="bzd0";
+    private boolean _if=true;
 
     public int test(){
         return 0;

@@ -18,35 +18,35 @@ import java.util.regex.Pattern;
 public class Tokenizer {
 
     //                                                  T  (java.lang.Math) . ?  pow      (  3 ,    2 )
-    private final Pattern staticPattern = Pattern.compile("(.*?T) *?\\((.*?)\\) *?\\. *(\\??) *?(.*)");
+    private static final Pattern staticPattern = Pattern.compile("(.*?T) *?\\((.*?)\\) *?\\. *(\\??) *?(.*)");
     //                                                        #  test    .   ?      val
-    private final Pattern referencePattern = Pattern.compile("(.*?#) *?(.*?) *?\\. *(\\??) *?(.*)");
-    //                                                         [1,2,3,4] [1]
-    private final Pattern collectionPattern = Pattern.compile("^(?!\\{.*?}) *?\\[(.*?)](?: *?\\[(.*)])?");
-    //                                                  {a:b,c:d} [2]
-    private final Pattern mapPattern = Pattern.compile("(\\{.*?})(?: *?\\[(.*)])?");
+    private static final Pattern referencePattern = Pattern.compile("(.*?#) *?(.*?) *?\\. *(\\??) *?(.*)");
+    //      static                                                    [1,2,3,4] [1]
+    private static final Pattern collectionPattern = Pattern.compile("^(?!\\{.*?}) *?\\[(.*?)](?: *?\\[(.*)])?");
+    //      static                                             {a:b,c:d} [2]
+    private static final Pattern mapPattern = Pattern.compile("(\\{.*?})(?: *?\\[(.*)])?");
 
-    private final Pattern strPattern = Pattern.compile("^'(.*?)'$");
+    private static final Pattern strPattern = Pattern.compile("^'(.*?)'$");
 
-    private final Pattern numeric = Pattern.compile("\\d+|\\d+[lL]");
+    private static final Pattern numeric = Pattern.compile("\\d+|\\d+[lL]");
 
-    private final Pattern bool = Pattern.compile("true|false");
+    private static final Pattern bool = Pattern.compile("true|false");
 
-    private final Pattern methodPattern = Pattern.compile("(.*?)\\((.*?)\\)");
-    //                                              T  (java.lang.Math) . ?  pow      (  3 ,    2 )
-    private final Pattern expressionBracket = Pattern.compile(".*?T *?\\($|.*?\\..*?\\w+ *?\\($");
+    private static final Pattern methodPattern = Pattern.compile("(.*?)\\((.*?)\\)");
+    //      static                                         T  (java.lang.Math) . ?  pow      (  3 ,    2 )
+    private static final Pattern expressionBracket = Pattern.compile(".*?T *?\\($|.*?\\..*?\\w+ *?\\($");
 
-    private final Pattern startWithSymbol = Pattern.compile("^[^a-zA-Z_].*");
-    //                                            [a-zA-Z0-9_]
-    private final Pattern varPattern = Pattern.compile("\\w+");
+    private static final Pattern startWithSymbol = Pattern.compile("^[^a-zA-Z_].*");
+    //      static                                       [a-zA-Z0-9_]
+    private static final Pattern varPattern = Pattern.compile("\\w+");
 
-    //[<=>|&!+_*?()]
-    private final Set<Character> operationSet = Set.of('=', '<', '>', '|', '&', '!', '+', '-', '*', '/', '(', ')');
-    private final Set<Character> bracket = Set.of('(', ')');
+    //[<=>| static !+_*?()]
+    private static final Set<Character> operationSet = Set.of('=', '<', '>', '|', '&', '!', '+', '-', '*', '/', '(', ')');
+    private static final Set<Character> bracket = Set.of('(', ')');
 
 
 
-    public TokenStream getTokenStream(String expression) {
+    public static TokenStream getTokenStream(String expression) {
         expression = expression.replaceAll("\r\n|\n", " ");
         TokenStream tokenStream = new TokenStream(expression);
 
@@ -67,7 +67,7 @@ public class Tokenizer {
             if (bracket.contains(inspectChar)) {
                 //构建token
                 if (inspectChar == '(') {
-                    if (this.expressionBracket.matcher(expression.substring(lastOps, i + 1).trim()).matches()) {
+                    if (Tokenizer.expressionBracket.matcher(expression.substring(lastOps, i + 1).trim()).matches()) {
                         expressionBracket = true;
                         continue;
                     }
@@ -116,7 +116,7 @@ public class Tokenizer {
             ExpressionSyntaxException.thr(expression,token);
         }
 
-        log.debug("resolve expression over,blew is tokenStream");
+
         for (Token t : tokenStream.getInfixExpression()) {
             System.out.println(JSON.toJSONString(t));
         }
@@ -126,7 +126,7 @@ public class Tokenizer {
     /**
      * @return 是否构建失败
      */
-    private boolean buildToken(TokenStream tokenStream, String token) {
+    private static boolean buildToken(TokenStream tokenStream, String token) {
         if (StringUtils.isEmpty(token)) return false;
         Matcher matcher = staticPattern.matcher(token);
         if (matcher.find()) {

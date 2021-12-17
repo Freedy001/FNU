@@ -25,11 +25,11 @@ import java.util.regex.Pattern;
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
-@JSONType(ignores = {"numeric", "strPattern", "context", "desiredType", "notFlag", "preSelfAddFlag", "preSelfSubFlag", "postSelfAddFlag", "postSelfSubFlag"})
+@JSONType(includes = {"type","value"})
 public class StaticToken extends ClassToken {
     private String opsClass;
-    private Pattern strPattern = Pattern.compile("^'(.*?)'$");
-    private Pattern numeric = Pattern.compile("\\d+|\\d+[lL]");
+    private final Pattern strPattern = Pattern.compile("^'(.*?)'$");
+    private final Pattern numeric = Pattern.compile("\\d+|\\d+[lL]");
 
     public StaticToken(String value) {
         super("static", value);
@@ -64,8 +64,7 @@ public class StaticToken extends ClassToken {
                             args.add(methodArg.matches(".*?[lL]$") ? Long.parseLong(methodArg) : Integer.parseInt(methodArg));
                             continue;
                         }
-                        Tokenizer tokenizer = new Tokenizer();
-                        TokenStream stream = tokenizer.getTokenStream(methodArg);
+                        TokenStream stream = Tokenizer.getTokenStream(methodArg);
                         Expression expression = new Expression(stream);
                         args.add(expression.getValue(context));
                     }
@@ -79,9 +78,9 @@ public class StaticToken extends ClassToken {
                 try {
                     Method method = staticClass.getMethod(methodName, args.stream().map(Object::getClass).toArray(Class[]::new));
                     method.setAccessible(true);
-                    return method.invoke(null, args.toArray());
+                    return checkAndSelfOps(method.invoke(null, args.toArray()));
                 } catch (Exception e) {
-                    throw new EvaluateException("invoke target method failed,because ?", e).errStr(methodName);
+                    throw new EvaluateException("invoke target method failed", e).errStr(methodName);
                 }
             } else {
                 throw new EvaluateException("can not calculate,methodName and propertyName is null!");
@@ -95,16 +94,17 @@ public class StaticToken extends ClassToken {
 
     @Override
     public void assignFrom(Token assignment) {
+        if (StringUtils.isEmpty(propertyName)) {
+            String methodStr = getMethodStr();
+            throw new EvaluateException("can not assign,because there is no reference or property").errStr(methodStr == null ? "=" : methodStr + "=");
+        }
         try {
-            if (StringUtils.isAnyEmpty(opsClass, propertyName)) {
-                throw new EvaluateException("can not assign,because reference or property is null");
-            }
             Class<?> staticClass = Class.forName(opsClass);
             Field field = ReflectionUtils.getFieldRecursion(staticClass, propertyName);
             field.setAccessible(true);
             field.set(null, assignment.calculateResult(field.getType()));
         } catch (Exception e) {
-            throw new EvaluateException("calculate result failed,because ?", e);
+            throw new EvaluateException("calculate result failed", e);
         }
     }
 }

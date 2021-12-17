@@ -6,10 +6,10 @@ package com.freedy.tinyFramework.Expression;
  */
 public class ExpressionPasser {
 
-    private final Tokenizer tokenizer = new Tokenizer();
+
 
     public Expression parseExpression(String expression) {
-        return new Expression(tokenizer.getTokenStream(expression));
+        return new Expression(Tokenizer.getTokenStream(expression));
     }
 
 

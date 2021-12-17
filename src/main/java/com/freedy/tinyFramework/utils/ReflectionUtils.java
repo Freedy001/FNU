@@ -38,7 +38,6 @@ public class ReflectionUtils {
         Class<?> objectClass = object.getClass();
         try {
             String getterMethodName = "get" + fieldName.substring(0, 1).toUpperCase() + fieldName.substring(1);
-            log.debug("invoke " + objectClass.getSimpleName() + "'s getter method===> {}", getterMethodName + "()");
             return objectClass.getMethod(getterMethodName).invoke(object);
         } catch (NoSuchMethodException e) {
             try {
@@ -66,7 +65,6 @@ public class ReflectionUtils {
         Class<?> objectClass = object.getClass();
         try {
             String setterMethodName = "set" + fieldName.substring(0, 1).toUpperCase() + fieldName.substring(1);
-            log.debug("invoke " + objectClass.getSimpleName() + "'s setter method===> {}", setterMethodName + "(" + fieldValue + ")");
             objectClass.getMethod(setterMethodName, getFieldRecursion(object.getClass(), fieldName).getType()).invoke(object, fieldValue);
         } catch (NoSuchMethodException e) {
             try {
@@ -106,7 +104,6 @@ public class ReflectionUtils {
     }
 
     private static boolean setObjValue(Object object, String fieldValue, Class<?> objectClass, Class<?> fieldType, String setterMethodName) throws IllegalAccessException, InvocationTargetException, NoSuchMethodException {
-        log.debug("invoke " + objectClass.getSimpleName() + "'s setter method===> {}", setterMethodName + "(" + fieldValue + ")");
         switch (fieldType.getSimpleName()) {
             case "String" -> objectClass.getMethod(setterMethodName, fieldType).invoke(object, fieldValue);
             case "Date" -> objectClass.getMethod(setterMethodName, fieldType).invoke(object, getDate(fieldValue));
@@ -525,7 +522,6 @@ public class ReflectionUtils {
         }
         return null;
     }
-
 
 }
 

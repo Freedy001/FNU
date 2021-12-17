@@ -23,11 +23,11 @@ import java.util.regex.Pattern;
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
-@JSONType(ignores = {"numeric","strPattern","context","desiredType","notFlag","preSelfAddFlag","preSelfSubFlag","postSelfAddFlag","postSelfSubFlag"})
+@JSONType(includes = {"type","value"})
 public class ReferenceToken extends ClassToken {
     private String referenceName;
-    private Pattern strPattern = Pattern.compile("^'(.*?)'$");
-    private Pattern numeric = Pattern.compile("\\d+|\\d+[lL]");
+    private final Pattern strPattern = Pattern.compile("^'(.*?)'$");
+    private final Pattern numeric = Pattern.compile("\\d+|\\d+[lL]");
 
 
     public ReferenceToken(String token) {
@@ -65,14 +65,13 @@ public class ReferenceToken extends ClassToken {
                         args.add(methodArg.matches(".*?[lL]$")?Long.parseLong(methodArg):Integer.parseInt(methodArg));
                         continue;
                     }
-                    Tokenizer tokenizer = new Tokenizer();
-                    TokenStream stream = tokenizer.getTokenStream(methodArg);
+                    TokenStream stream = Tokenizer.getTokenStream(methodArg);
                     Expression expression = new Expression(stream);
                     args.add(expression.getValue(context));
                 }
                 Method method = variable.getClass().getMethod(methodName, args.stream().map(Object::getClass).toArray(Class[]::new));
                 method.setAccessible(true);
-                return method.invoke(variable,args.toArray());
+                return checkAndSelfOps(method.invoke(variable,args.toArray()));
             }else {
                 //todo
                 throw new EvaluateException("can not calculate,methodName and propertyName is null!").errStr(value);

@@ -1,7 +1,9 @@
 package com.freedy.tinyFramework.Expression;
 
+import com.freedy.tinyFramework.Expression.token.Assignable;
 import com.freedy.tinyFramework.Expression.token.OpsToken;
 import com.freedy.tinyFramework.Expression.token.Token;
+import com.freedy.tinyFramework.exception.EvaluateException;
 import com.freedy.tinyFramework.exception.ExpressionSyntaxException;
 import lombok.Getter;
 
@@ -14,9 +16,11 @@ import java.util.*;
 public class TokenStream {
     @Getter
     private final List<Token> infixExpression = new ArrayList<>();
-    private final Set<String> doubleOps = Set.of("||", "&&", "!=", "==", ">=", "<=", "++", "--", "+=", "-=");
-    private final Set<String> singleOps = Set.of("++", "--", "!");
-    private final List<Set<String>> priorityOps = Arrays.asList(
+    private static final Set<String> doubleOps = Set.of("||", "&&", "!=", "==", ">=", "<=", "++", "--", "+=", "-=", "/=", "*=");
+    private static final Set<String> permitOps = Set.of("=!", "||!", "&&!", "==!", ">++", "<++", ">=++", "<=++", ">--", "<--", ">=--", "<=--", "+-", "-+", "++-", "--+");
+    private static final Set<String> single2TokenOps = Set.of("+++", "---");
+    private static final Set<String> singleOps = Set.of("++", "--", "!");
+    private static final List<Set<String>> priorityOps = Arrays.asList(
             Set.of("=", ">", "<", "||", "&&", "==", "!=", ">=", "<="),
             Set.of("+", "-", "+=", "-="),
             Set.of("*", "/"),
@@ -32,7 +36,7 @@ public class TokenStream {
         this.expression = expression;
     }
 
-    public int opsPriority(String ops) {
+    public static int opsPriority(String ops) {
         for (int i = 0; i < priorityOps.size(); i++) {
             if (priorityOps.get(i).contains(ops)) {
                 return i;
@@ -49,18 +53,36 @@ public class TokenStream {
         int size = infixExpression.size();
         if (size == 0) return false;
         Token token = infixExpression.get(size - 1);
-        if (token.isType("operation") && !token.isValue(")")) {
+        if (token.isType("operation") && !token.isAnyValue("(", ")")) {
             String nOps = token.getValue() + currentOps;
             if (doubleOps.contains(nOps)) {
                 token.setValue(nOps);
-                return true;
             } else {
-                if (nOps.matches("\\+\\+\\+|---|\\+\\+-|--\\+")) {
-                    infixExpression.add(new OpsToken(nOps.substring(2)));
+                //区分a++ + 5
+                if (single2TokenOps.contains(nOps)) {
+                    //+++    ---
+                    Token preToken = infixExpression.get(size - 2);
+                    if (preToken.isType("operation")) {
+                        // a ++ +++  --->  a ++ + ++
+                        token.setValue(nOps.substring(0, 1));
+                        infixExpression.add(new OpsToken(nOps.substring(1, 3)));
+                    } else if (preToken instanceof Assignable) {
+                        // a +++ --->  a ++ +
+                        infixExpression.add(new OpsToken(nOps.substring(2, 3)));
+                    } else {
+                        // a +++ --->  a + ++
+                        infixExpression.add(new OpsToken(nOps.substring(2, 3)));
+                    }
+                    //这里不会出现++- --+ +-- -++的情况
                     return true;
                 }
-                ExpressionSyntaxException.thr(expression,nOps);
+                if (!permitOps.contains(nOps)) {
+                    ExpressionSyntaxException.thr(expression, nOps);
+                    return true;
+                }
+                infixExpression.add(new OpsToken(currentOps + ""));
             }
+            return true;
         }
         return false;
     }
@@ -78,11 +100,17 @@ public class TokenStream {
         infixExpression.add(token);
     }
 
+    public void setEachTokenContext(EvaluationContext context) {
+        infixExpression.forEach(item -> item.setContext(context));
+    }
 
     // b<a=2+3+(5*4/2)
     // ba2=
     // <=+
     public List<Token> calculateSuffix() {
+        //计算偏移量
+        calculateOffset();
+        //合并单值操作
         mergeSingleTokenOps();
         List<Token> suffixExpression = new ArrayList<>();
         Stack<Token> opsStack = new Stack<>();
@@ -98,7 +126,7 @@ public class TokenStream {
                 }
                 while (true) {
                     pop = opsStack.isEmpty() ? null : opsStack.peek();
-                    if (pop != null && !token.isValue("(") && opsPriority(pop.getValue()) > opsPriority(token.getValue())) {
+                    if (pop != null && !token.isValue("(") && opsPriority(pop.getValue()) >= opsPriority(token.getValue())) {
                         //opsStack中的优先级较大 --> 压不住要跳出来
                         suffixExpression.add(opsStack.pop());
                     } else {
@@ -147,11 +175,12 @@ public class TokenStream {
                                 ExpressionSyntaxException.tokenThr(expression, token);
                             }
                             assert nextToken != null;
-                            if (ops.equals("++"))
+                            if (ops.equals("++")) {
                                 nextToken.setPreSelfAddFlag(true);
-                            else
+                            } else
                                 nextToken.setPreSelfSubFlag(true);
                             infixExpression.remove(i);
+                            nextToken.setOriginToken(token, nextToken);
                             continue;
                         }
                         if (nextToken == null || nextToken.isType("operation")) {
@@ -160,18 +189,30 @@ public class TokenStream {
                             else
                                 preToken.setPostSelfSubFlag(true);
                             infixExpression.remove(i);
+                            preToken.setOriginToken(preToken, token);
                         }
                     }
                 }
+            } catch (EvaluateException e) {
+                ExpressionSyntaxException.thrEvaluateException(e, expression, token);
             } catch (Exception e) {
-                ExpressionSyntaxException.tokenThr(e.getMessage(), expression, token);
+                ExpressionSyntaxException.tokenThr(e, expression, token);
             }
         }
 
     }
 
-    public Token getToken(int index) {
-        return infixExpression.get(index);
+    private void calculateOffset() {
+        String expression = this.expression;
+        int cursor = 0;
+        for (Token token : infixExpression) {
+            String value = token.getValue();
+            int strOffset = expression.indexOf(value);
+            token.setOffset(cursor + strOffset);
+            int cutIndex = strOffset + value.length();
+            expression = expression.substring(cutIndex);
+            cursor += cutIndex;
+        }
     }
 
 }
