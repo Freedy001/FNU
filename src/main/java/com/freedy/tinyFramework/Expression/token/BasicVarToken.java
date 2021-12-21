@@ -3,13 +3,18 @@ package com.freedy.tinyFramework.Expression.token;
 import com.alibaba.fastjson.annotation.JSONType;
 import com.freedy.tinyFramework.exception.EvaluateException;
 import com.freedy.tinyFramework.exception.IllegalArgumentException;
+import com.freedy.tinyFramework.utils.ReflectionUtils;
+import lombok.NoArgsConstructor;
+
+import java.math.BigDecimal;
 
 /**
  * @author Freedy
  * @date 2021/12/15 16:50
  */
-@JSONType(includes = {"type","value"})
-public class BasicVarToken extends Token {
+@NoArgsConstructor
+@JSONType(includes = {"type", "value"})
+public final class BasicVarToken extends Token {
 
     public BasicVarToken(String type, String value) {
         super(type, value);
@@ -19,7 +24,7 @@ public class BasicVarToken extends Token {
     @Override
     public Object doCalculate(Class<?> desiredType) {
         if (isType("str")) {
-            return checkAndSelfOps(value);
+            return checkAndSelfOps(ReflectionUtils.convertType(value, desiredType));
         }
         if (isType("numeric")) { //int long
             if (desiredType.getName().matches("java\\.lang\\.Integer|int")) {
@@ -30,7 +35,11 @@ public class BasicVarToken extends Token {
             }
             if (value.contains(".")) {
                 return Double.parseDouble(value);
-            } else if (value.contains("l") || value.contains("L")) {
+            }
+            if (new BigDecimal(value).compareTo(new BigDecimal(Integer.MAX_VALUE)) > 0) {
+                if (new BigDecimal(value).compareTo(new BigDecimal(Long.MAX_VALUE)) > 0) {
+                    throw new EvaluateException("? exceed the max of the Long ?", value, Long.MAX_VALUE);
+                }
                 return checkAndSelfOps(Long.parseLong(value));
             } else {
                 return checkAndSelfOps(Integer.parseInt(value));
@@ -39,7 +48,7 @@ public class BasicVarToken extends Token {
         if (isType("bool")) {
             return checkAndSelfOps(notFlag != Boolean.parseBoolean(value));
         }
-        throw new EvaluateException("illegal type ?", type).errStr(type);
+        throw new EvaluateException("illegal type ?", type).errToken(this);
     }
 
 

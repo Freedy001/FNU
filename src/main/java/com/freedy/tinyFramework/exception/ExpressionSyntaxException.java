@@ -4,7 +4,7 @@ import com.freedy.tinyFramework.Expression.token.Token;
 import com.freedy.tinyFramework.utils.PlaceholderParser;
 import com.freedy.tinyFramework.utils.StringUtils;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.SneakyThrows;
 
 import java.lang.reflect.Field;
@@ -14,9 +14,16 @@ import java.util.*;
  * @author Freedy
  * @date 2021/12/15 9:49
  */
-@Data
-@EqualsAndHashCode(callSuper = true)
 public class ExpressionSyntaxException extends RuntimeException {
+
+    public static void tokenThr(String msg, String expression, Token... tokens) {
+        new ExpressionSyntaxException(expression)
+                .buildMsg(msg)
+                .buildToken(tokens)
+                .buildConsoleErrorMsg()
+                .buildStackTrace()
+                .thr();
+    }
 
 
     public static void tokenThr(String expression, Token... tokens) {
@@ -40,12 +47,9 @@ public class ExpressionSyntaxException extends RuntimeException {
 
     public static void thrEvaluateException(EvaluateException e, String expression, Token token) {
         List<Token> tokens = e.getTokenList();
-        List<String> list = e.getSyntaxErrSubStrList();
-        boolean noErrInfo = tokens.isEmpty() && list.isEmpty();
         new ExpressionSyntaxException(expression)
                 .buildCause(e)
-                .buildToken(noErrInfo ? new Token[]{token} : tokens.toArray(Token[]::new))
-                .buildErrorStr(noErrInfo ? null : list.toArray(String[]::new))
+                .buildToken(tokens.isEmpty() ? new Token[]{token} : tokens.toArray(Token[]::new))
                 .buildConsoleErrorMsg()
                 .buildStackTrace()
                 .thr();
@@ -56,18 +60,37 @@ public class ExpressionSyntaxException extends RuntimeException {
         new ExpressionSyntaxException(expression)
                 .buildErrorStr(syntaxErrSubStr)
                 .buildConsoleErrorMsg()
-                .buildStackTrace()
                 .thr();
     }
 
 
+    public static void thrWithMsg(String msg, String expression, String... syntaxErrSubStr) {
+        new ExpressionSyntaxException(expression)
+                .buildErrorStr(syntaxErrSubStr)
+                .buildMsg(msg)
+                .buildConsoleErrorMsg()
+                .thr();
+    }
+
+    public static void thrThis(String expression,ExpressionSyntaxException thisException){
+        new ExpressionSyntaxException(expression)
+                .buildErrorStr(thisException.getSyntaxErrStr().toArray(String[]::new))
+                .buildToken(thisException.getLayer().toArray(Token[]::new))
+                .buildMsg("sub expression err")
+                .buildCause(thisException)
+                .buildConsoleErrorMsg()
+                .thr();
+    }
+
+    private final String expression;
     private String msg;
     private Throwable cause;
-    private List<List<Token>> layer;
-    private String expression;
+    @Getter
+    private final List<Token> layer = new ArrayList<>();
+    @Getter
+    private final List<String> syntaxErrStr = new ArrayList<>();
     private PlaceholderParser placeholder;
-    private List<String> syntaxErrStr;
-    private Map<Token, int[]> currentTokenIndex = new HashMap<>();
+    private Map<Token, int[]> currentTokenIndex = new TreeMap<>(Comparator.comparing(Token::getOffset));
 
     public ExpressionSyntaxException(String expression) {
         this.expression = expression;
@@ -75,37 +98,24 @@ public class ExpressionSyntaxException extends RuntimeException {
 
     public ExpressionSyntaxException buildToken(Token... tokens) {
         if (tokens == null || tokens.length == 0) {
-            layer = new ArrayList<>();
             return this;
         }
 
-        List<List<Token>> list = new ArrayList<>();
         LinkedList<Token> queue = new LinkedList<>(Arrays.asList(tokens));
         queue.sort(Comparator.comparingInt(Token::getOffset));
 
-        queue.add(null);
-        List<Token> t = new ArrayList<>();
         while (!queue.isEmpty()) {
             Token poll = queue.poll();
-            if (poll == null) {
-                list.add(t);
-                if (queue.isEmpty()) break;
-                t = new ArrayList<>();
-                queue.add(null);
-                continue;
-            }
-            t.add(poll);
+
             List<Token> originToken = poll.getOriginToken();
-            if (originToken != null && !originToken.isEmpty()) {
+            if (originToken != null) {
                 for (Token origin : originToken) {
                     origin.setSonToken(poll);
                     queue.add(origin);
                 }
+            } else {
+                layer.add(poll);
             }
-        }
-        layer = new ArrayList<>();
-        for (int i = list.size() - 1; i > 0; i--) {
-            layer.add(list.get(i));
         }
         return this;
     }
@@ -113,7 +123,6 @@ public class ExpressionSyntaxException extends RuntimeException {
 
     public ExpressionSyntaxException buildErrorStr(String... str) {
         if (str == null) return this;
-        if (syntaxErrStr == null) syntaxErrStr = new ArrayList<>();
         for (String s : str) {
             if (StringUtils.hasText(s)) {
                 syntaxErrStr.add(s);
@@ -133,19 +142,15 @@ public class ExpressionSyntaxException extends RuntimeException {
     }
 
     public ExpressionSyntaxException buildConsoleErrorMsg() {
-        List<SyntaxErr> syntaxErrSubStr = new ArrayList<>(layer.remove(0).stream().map(SyntaxErr::new).toList());
+        List<SyntaxErr> syntaxErrSubStr = new ArrayList<>(layer.stream().map(SyntaxErr::new).toList());
         syntaxErrSubStr.addAll((syntaxErrStr.stream().map(SyntaxErr::new).toList()));
 
         StringBuilder highlightExpression = new StringBuilder();
         StringBuilder underLine = new StringBuilder();
         TreeMap<Integer, int[]> map = new TreeMap<>();
-        for (SyntaxErr s : syntaxErrSubStr) {
-            int[] i = findIndex(expression, s);
-            if (s.isTokenType()) {
-                currentTokenIndex.put(s.getRelevantToken(), i);
-            }
+        for (int[] i : findAllIndex(expression, syntaxErrSubStr)) {
             if (i == null) {
-                highlightExpression.append(new PlaceholderParser("expression: ? illegal at ?*", expression, syntaxErrSubStr).configPlaceholderHighLight(PlaceholderParser.PlaceholderHighLight.HIGH_LIGHT_CYAN));
+                highlightExpression.append(new PlaceholderParser("expression: ? illegal at ?*", expression, syntaxErrSubStr.stream().map(SyntaxErr::getInfo).toArray()).configPlaceholderHighLight(PlaceholderParser.PlaceholderHighLight.HIGH_LIGHT_CYAN));
                 break;
             } else {
                 //排序
@@ -167,42 +172,36 @@ public class ExpressionSyntaxException extends RuntimeException {
         placeholder = new PlaceholderParser("""
                             
                             
-                \033[93m? at:\033[0;39m
+                \033[93m:)?\033[93m at:\033[0;39m
                     ?
-                    \033[91m?\033[0;39m""", msg == null ? (cause == null ? ":)syntax error" : cause.getMessage()) : msg, highlightExpression, underLine
+                    \033[91m?\033[0;39m""", msg == null ? (cause == null ? "syntax error" : cause.getMessage()) : msg, highlightExpression, underLine
         );
         return this;
     }
 
     public ExpressionSyntaxException buildStackTrace() {
-        for (List<Token> tokenList : layer) {
-            LinkedHashMap<Token, int[]> tokenIndex = new LinkedHashMap<>();
-            tokenList.sort(Comparator.comparing(Token::getOffset));
-            for (Token token : tokenList) {
-                List<Token> originToken = token.getOriginToken();
-                TreeMap<Integer, int[]> map = new TreeMap<>();
-                for (Token origin : originToken) {
-                    int[] ints = currentTokenIndex.get(origin);
-                    map.put(ints[0], ints);
-                }
-                int midIndex = (map.firstKey() + map.lastEntry().getValue()[1]) / 2;
-                int length = token.getValue().length();
-                tokenIndex.put(token, new int[]{midIndex - length / 2, midIndex + (length - length / 2)});
-            }
+        if (placeholder == null) {
+            throw new UnsupportedOperationException("please call buildConsoleErrorMsg() first!");
+        }
+        Map<Token, int[]> layer;
+
+        while ((layer = getNextLayer()) != null) {
+            currentTokenIndex = layer;
             StringBuilder builder = new StringBuilder();
-            StringBuilder underLine = new StringBuilder();
             int[] lastSplit = {0};
-            tokenIndex.forEach((k, v) -> {
-                builder.append(" ".repeat(v[0] - lastSplit[0])).append(k.getValue());
-                underLine.append(" ".repeat(v[0] - lastSplit[0])).append(k.getValue());
+            layer.forEach((k, v) -> {
+                if (k.isType("operation")) return;
+                builder.append(" ".repeat(v[0] - lastSplit[0])).append(k.getValue(), 0, v[1]-v[0]);
                 lastSplit[0] = v[1];
             });
             builder.append(" ".repeat(expression.length() - lastSplit[0]));
             placeholder.join(true, """
-                    \033[93m?\033[0;39m
-                    \033[91m?\033[0;39m
-                    """, builder, underLine);
+                                                        
+                            \t\033[4:95m?\033[0;39m""",
+                    builder
+            );
         }
+        placeholder.join(true, "\n");
         return this;
     }
 
@@ -214,25 +213,107 @@ public class ExpressionSyntaxException extends RuntimeException {
         Field exceptionMsg;
         exceptionMsg = aClass.getDeclaredField("detailMessage");
         exceptionMsg.setAccessible(true);
-        exceptionMsg.set(this, placeholder.toString());
+        exceptionMsg.set(this, placeholder == null ? "white blank" : placeholder.toString());
         if (cause != null) {
-            Field cause = aClass.getDeclaredField("cause");
-            cause.setAccessible(true);
-            cause.set(this, cause);
+            Field causeField = aClass.getDeclaredField("cause");
+            causeField.setAccessible(true);
+            causeField.set(this, cause);
         }
         throw this;
     }
 
+    private Map<Token, int[]> getNextLayer() {
+        Token sonToken = null;
+        int startIndex = 0;
+        int endIndex = 0;
+        Map<Token, int[]> resultMap = new LinkedHashMap<>();
+        Map<Token, int[]> tokenMap = new LinkedHashMap<>();
+        boolean noSonToken = true;
+        for (Map.Entry<Token, int[]> entry : currentTokenIndex.entrySet()) {
+            while (true) {
+                if (sonToken == null) {
+                    sonToken = entry.getKey().getSonToken();
+                    if (sonToken == null) {
+                        resultMap.put(entry.getKey(), entry.getValue());
+                        break;
+                    }
+                    int[] i = entry.getValue();
+                    startIndex = i[0];
+                    endIndex = i[1];
+                    tokenMap.put(entry.getKey(), entry.getValue());
+                    break;
+                }
+
+                if (sonToken == entry.getKey().getSonToken()) {
+                    endIndex = entry.getValue()[1];
+                    tokenMap.put(entry.getKey(), entry.getValue());
+                    break;
+                }
+
+                if (sonToken.getOriginToken().size() == tokenMap.size()) {
+                    int midIndex = (endIndex + startIndex) / 2;
+                    int len = sonToken.getValue().length();
+                    int midLen = len / 2;
+                    resultMap.put(sonToken, new int[]{Math.max(midIndex - midLen, startIndex), Math.min(midIndex + (len - midLen), endIndex)});
+                    noSonToken = false;
+                } else {
+                    resultMap.putAll(tokenMap);
+                }
+                tokenMap.clear();
+                sonToken = null;
+            }
+        }
+        if (sonToken != null) {
+            if (sonToken.getOriginToken().size() == tokenMap.size()) {
+                int midIndex = (endIndex + startIndex) / 2;
+                int len = sonToken.getValue().length();
+                int midLen = len / 2;
+                resultMap.put(sonToken, new int[]{Math.max(midIndex - midLen, startIndex), Math.min(midIndex + (len - midLen), endIndex)});
+                noSonToken = false;
+            } else {
+                resultMap.putAll(tokenMap);
+            }
+        }
+        return noSonToken ? null : resultMap;
+    }
+
+
+    private int[][] findAllIndex(String str, List<SyntaxErr> errList) {
+        List<int[]> result = new ArrayList<>();
+        for (SyntaxErr err : errList) {
+            //找到token的坐标   返回的结果数组的数量大于2表示匹配到多个值
+            int[] subStrIndex = findSubStrIndex(str, err.info, err.startIndex);
+            if (err.isTokenType()) {
+
+                List<String> subStrList = err.getRelevantToken().getErrStr();
+                if (subStrList != null && !subStrList.isEmpty()) {
+                    for (String sub : subStrList) {
+                        subStrIndex = findSubStrIndex(str, sub, err.startIndex);
+                        result.add(subStrIndex);
+                    }
+                } else {
+                    result.add(subStrIndex);
+                }
+
+                currentTokenIndex.put(err.relevantToken, subStrIndex);
+            } else {
+                result.add(subStrIndex);
+            }
+
+        }
+        return result.toArray(int[][]::new);
+    }
+
 
     @SuppressWarnings("StatementWithEmptyBody")
-    private int[] findIndex(String str, SyntaxErr err) {
-        String substr = err.info.trim();
+    private int[] findSubStrIndex(String str, String subStr, int startIndex) {
         char[] chars = str.toCharArray();
-        char[] subChars = substr.toCharArray();
         int len = chars.length;
+        char[] subChars = subStr.toCharArray();
         int subLen = subChars.length;
         int behindIndex = -1;
-        for (int i = err.startIndex; i < len; i++) {
+
+        for (int i = startIndex; i < len; i++) {
             if (chars[i] == ' ') continue;
             int start = i;
             for (int j = 0; j < subLen; j++, i++) {
@@ -258,14 +339,16 @@ public class ExpressionSyntaxException extends RuntimeException {
         return null;
     }
 
+
     @Data
     static class SyntaxErr {
         String info;
         int startIndex;
         Token relevantToken;
+        int middleIndex;
 
         boolean isTokenType() {
-            return relevantToken == null;
+            return relevantToken != null;
         }
 
         public SyntaxErr(String info) {

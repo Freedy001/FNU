@@ -73,6 +73,7 @@ public class PlaceholderParser {
 
     public PlaceholderParser reset(String str, Object... params) {
         sqlBuilder.delete(0, sqlBuilder.length());
+        toStringCache = null;
         this.sqlBuilder.append(str);
         this.params.clear();
         this.params.addAll(Arrays.asList(params));
@@ -80,6 +81,7 @@ public class PlaceholderParser {
     }
 
     public PlaceholderParser clearConfig() {
+        toStringCache = null;
         toStringCache = "";
         split = ",";
         eachSerialParamsSize = new int[0];
@@ -112,6 +114,7 @@ public class PlaceholderParser {
      * @param split 默认分隔符
      */
     public PlaceholderParser serialParamsSplit(String split) {
+        toStringCache = null;
         this.split = split;
         return this;
     }
@@ -120,6 +123,7 @@ public class PlaceholderParser {
      * 指定位置的分隔符
      */
     public PlaceholderParser serialParamsSplit(int index, String split) {
+        toStringCache = null;
         indexSplit.put(index, split);
         return this;
     }
@@ -128,6 +132,7 @@ public class PlaceholderParser {
      * 当你输入的参数与 <b>?</b> 的个数不匹配时将使用你指定的字符填充.
      */
     public PlaceholderParser ifNullFillWith(Object nullCharacter) {
+        toStringCache = null;
         int questionSymbolNum = 0;
         for (char c : sqlBuilder.toString().toCharArray()) {
             if (c == '?') questionSymbolNum++;
@@ -144,6 +149,7 @@ public class PlaceholderParser {
      * 如果传入的是集合且集合为空则用你指定的字符填充
      */
     public PlaceholderParser ifEmptyFillWith(Object emptyCharacter) {
+        toStringCache = null;
         this.emptyCharacter = emptyCharacter;
         return this;
     }
@@ -153,6 +159,7 @@ public class PlaceholderParser {
      */
     public PlaceholderParser join(boolean condition, String joinSql, Object... params) {
         if (condition) {
+            toStringCache = null;
             sqlBuilder.append(joinSql);
             this.params.addAll(Arrays.asList(params));
         }
@@ -160,11 +167,13 @@ public class PlaceholderParser {
     }
 
     public PlaceholderParser registerNoneHighLightClass(Class<?> ...classes){
+        toStringCache = null;
         noneHighLightClass.addAll(Arrays.asList(classes));
         return this;
     }
 
     public PlaceholderParser configPlaceholderHighLight(PlaceholderHighLight highLight) {
+        toStringCache=null;
         switch (highLight) {
             case NONE -> {
                 setStart("");
@@ -201,11 +210,13 @@ public class PlaceholderParser {
     }
 
     private void setStart(String start) {
+        toStringCache=null;
         highLightNumStart = start;
         highLightStrStart = start;
     }
 
     private void setEnd(String end) {
+        toStringCache=null;
         highLightNumEnd = end;
         highLightStrEnd = end;
     }

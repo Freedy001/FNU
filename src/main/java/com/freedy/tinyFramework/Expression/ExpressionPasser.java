@@ -12,6 +12,10 @@ public class ExpressionPasser {
         return new Expression(Tokenizer.getTokenStream(expression));
     }
 
+    public BlockExpression parseExpressionBlock(String expression) {
+        return new BlockExpression(Tokenizer.getTokenStreamList(expression));
+    }
+
 
     public Expression parseExpression(String expression, ParserContext context) {
         return null;

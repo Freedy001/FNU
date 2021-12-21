@@ -11,14 +11,14 @@ import java.util.Map;
  */
 @Data
 public class TestClass2 {
-    private String name;
-    private int age=0;
-    private boolean gender;
-    private double weight;
-    private List<String> list;
-    private Map<String, String> map;
-    private TestClass testClass;
-
+    public String name="TestClass2";
+    public int age=0;
+    public boolean gender;
+    public double weight;
+    public List<String> list;
+    public Map<String, String> map;
+    public TestClass testClass;
+    public TestClass3 t3;
 
 
 }

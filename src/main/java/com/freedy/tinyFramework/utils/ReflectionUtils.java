@@ -35,23 +35,41 @@ public class ReflectionUtils {
      * @return 对应字段的值 没有则返回null
      */
     public static Object getter(Object object, String fieldName) {
-        Class<?> objectClass = object.getClass();
+        return getter(object.getClass(), object, fieldName);
+    }
+
+    public static Object getter(Class<?> objectClass, Object object, String fieldName) {
         try {
-            String getterMethodName = "get" + fieldName.substring(0, 1).toUpperCase() + fieldName.substring(1);
-            return objectClass.getMethod(getterMethodName).invoke(object);
-        } catch (NoSuchMethodException e) {
-            try {
-                Field field = objectClass.getDeclaredField(fieldName);
-                field.setAccessible(true);
-                return field.get(object);
-            } catch (Exception ex) {
-                throw new IllegalArgumentException("get value failed,because ?", ex);
+            if (object == null) {
+                return getFieldVal(objectClass, null, fieldName);
+            } else {
+                String getterMethodName = "get" + fieldName.substring(0, 1).toUpperCase() + fieldName.substring(1);
+                return objectClass.getMethod(getterMethodName).invoke(object);
             }
+        } catch (NoSuchMethodException e) {
+            return getFieldVal(objectClass, object, fieldName);
+        } catch (IllegalArgumentException e) {
+            throw e;
         } catch (Exception e) {
             throw new IllegalArgumentException("get value failed,because ?", e);
         }
     }
 
+
+    public static Object getFieldVal(Class<?> objectClass, Object object, String fieldName) {
+        try {
+            Field field = getFieldRecursion(objectClass, fieldName);
+            if (field == null) {
+                throw new IllegalArgumentException("no such field: ?", fieldName);
+            }
+            field.setAccessible(true);
+            return field.get(object);
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("get value failed!", ex);
+        }
+    }
 
     /**
      * 调用setter方法对相应字段进行设置
@@ -59,23 +77,37 @@ public class ReflectionUtils {
      * @param object     需要被设置字段的对象
      * @param fieldName  字段名
      * @param fieldValue 需要设置的值
-     * @return 是否设置成功
      */
     public static void setter(Object object, String fieldName, Object fieldValue) {
-        Class<?> objectClass = object.getClass();
+        setter(object.getClass(), object, fieldName, fieldValue);
+    }
+
+    public static void setter(Class<?> objectClass, Object object, String fieldName, Object fieldValue) {
         try {
-            String setterMethodName = "set" + fieldName.substring(0, 1).toUpperCase() + fieldName.substring(1);
-            objectClass.getMethod(setterMethodName, getFieldRecursion(object.getClass(), fieldName).getType()).invoke(object, fieldValue);
-        } catch (NoSuchMethodException e) {
-            try {
-                Field field = getFieldRecursion(objectClass, fieldName);
-                field.setAccessible(true);
-                field.set(object, fieldValue);
-            } catch (Exception ex) {
-                throw new IllegalArgumentException("set value failed,because ?", ex);
+            if (object == null) {
+                setFieldValue(objectClass, null, fieldName, fieldValue);
+            } else {
+                String setterMethodName = "set" + fieldName.substring(0, 1).toUpperCase() + fieldName.substring(1);
+                objectClass.getMethod(setterMethodName, getFieldRecursion(object.getClass(), fieldName).getType()).invoke(object, fieldValue);
             }
+        } catch (NoSuchMethodException e) {
+            setFieldValue(objectClass, object, fieldName, fieldValue);
         } catch (Exception e) {
             throw new IllegalArgumentException("set value failed,because ?", e);
+        }
+    }
+
+
+    public static void setFieldValue(Class<?> objectClass, Object object, String fieldName, Object fieldValue) {
+        try {
+            Field field = getFieldRecursion(objectClass, fieldName);
+            if (field == null) {
+                throw new IllegalArgumentException("no such field: ?", fieldName);
+            }
+            field.setAccessible(true);
+            field.set(object, fieldValue);
+        } catch (Exception ex) {
+            throw new IllegalArgumentException("set value failed,because ?", ex);
         }
     }
 
@@ -378,8 +410,8 @@ public class ReflectionUtils {
             case "short", "Short" -> returnValue = Short.parseShort(strValue.toString());
             case "Byte", "byte" -> returnValue = Byte.parseByte(strValue.toString());
             case "Character", "char" -> returnValue = strValue.toString().charAt(0);
-            case "String" -> returnValue = strValue.toString();
-            default -> throw new UnsupportedOperationException("unsupported current type " + type.getName());
+            case "String", "Object" -> returnValue = strValue.toString();
+            default -> throw new UnsupportedOperationException("can not convert String to " + type.getName());
         }
         return (T) returnValue;
     }
@@ -521,6 +553,68 @@ public class ReflectionUtils {
             }
         }
         return null;
+    }
+
+
+    public static Object invokeMethod(Object target, String methodName, Object... args) throws Exception {
+        return invokeMethod(target.getClass(), target, methodName, args);
+    }
+
+    public static Object invokeMethod(Class<?> targetClass, Object target, String methodName, Object... args) throws Exception {
+        List<Method> list = new ArrayList<>();
+        for (Method method : targetClass.getDeclaredMethods()) {
+            if (method.getName().equals(methodName)) {
+                list.add(method);
+            }
+        }
+        int length = args.length;
+        for (Method method : list) {
+            if (method.getParameterCount() == length) {
+                Class<?>[] clazz = method.getParameterTypes();
+                int i = 0;
+                for (; i < length; i++) {
+                    Class<?> originMethodArgs = convertToWrapper(clazz[i]);
+                    Class<?> supplyMethodArgs = convertToWrapper(args[i].getClass());
+                    if (!originMethodArgs.isAssignableFrom(supplyMethodArgs)) {
+                        break;
+                    }
+                }
+                if (i == length) {
+                    method.setAccessible(true);
+                    return method.invoke(target, args);
+                }
+            }
+        }
+        if (methodName.equals("getClass") && args.length == 0) return targetClass;
+        StringJoiner argStr = new StringJoiner(",", "(", ")");
+        for (Object arg : args) {
+            argStr.add(arg.getClass().getName());
+        }
+        throw new NoSuchMethodException("no such method " + methodName + argStr + "!you can call these method:" + new PlaceholderParser("?*", list.stream().map(method -> {
+            StringJoiner argString = new StringJoiner(",", "(", ")");
+            for (Parameter arg : method.getParameters()) {
+                argString.add(arg.getType().getSimpleName() + " " + arg.getName());
+            }
+            return method.getName() + argString;
+        }).toArray()).serialParamsSplit(" , "));
+    }
+
+    @SneakyThrows
+    public static <T> T copyProperties(T target, String... excludes) {
+        Class<T> targetClass = (Class<T>) target.getClass();
+        Set<String> excludeSet = Set.of(excludes);
+        Object instance = targetClass.getConstructor().newInstance();
+        for (Class<?> aClass : getClassRecursion(targetClass)) {
+            for (Field field : aClass.getDeclaredFields()) {
+                if (excludeSet.contains(field.getName())) continue;
+                field.setAccessible(true);
+                try {
+                    field.set(instance, field.get(target));
+                } catch (Exception ignored) {
+                }
+            }
+        }
+        return targetClass.cast(instance);
     }
 
 }

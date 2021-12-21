@@ -1,10 +1,13 @@
 package ExpressionTest;
 
+import com.freedy.tinyFramework.Expression.BlockExpression;
 import com.freedy.tinyFramework.Expression.Expression;
 import com.freedy.tinyFramework.Expression.ExpressionPasser;
 import com.freedy.tinyFramework.Expression.StanderEvaluationContext;
 import com.freedy.tinyFramework.utils.PlaceholderParser;
+import lombok.SneakyThrows;
 
+import java.util.Scanner;
 import java.util.StringJoiner;
 import java.util.function.Supplier;
 
@@ -18,10 +21,12 @@ public class Main {
     public static StanderEvaluationContext context = new StanderEvaluationContext(new TestClass());
     private static TestClass test = new TestClass();
     private static TestClass2 class2 = new TestClass2();
+    private static TestClass3 class3 = new TestClass3();
 
     static {
         context.setVariable("test", test);
         context.setVariable("class2", class2);
+        context.setVariable("class3", class3);
     }
 
     /*
@@ -44,9 +49,9 @@ public class Main {
       ||
       &&
     */
+    @SneakyThrows
     public static void main(String[] args) throws InterruptedException {
-
-//        evaluate("T(ExpressionTest.TestClass).NAME");
+//        evaluate("T(ExpressionTest.TestClass).testClass2.getName()");
 //        evaluate("T(ExpressionTest.TestClass).NAME='haha'",()->TestClass.NAME);
 //        evaluate("T(ExpressionTest.TestClass).AGE++",()->TestClass.AGE);
 //        evaluate("T(ExpressionTest.TestClass).AGE--",()->TestClass.AGE);
@@ -76,8 +81,51 @@ public class Main {
 //        evaluate("#test.name='nihao'",()->test.getName());
 
 //        evaluate("#test._if=(!T(ExpressionTest.TestClass).IF||#test._if&&false)", () -> test.is_if());
-//        evaluate("#test._if = (3+5>23 && 5*9<4)", () -> test.getName());
-        evaluate("55+55>55 && 55*55<55", () -> test.getName());
+//        evaluate("#test?.abxc");
+//        evaluate("#test?.age");
+//        evaluate("#test?.name.replace('bzd','haha')");
+//        evaluate("#tes?._if");
+//        evaluate("#tes?.haha()");
+//        evaluate("def haha='nihao'",()->test.getAge());
+//        evaluate("#haha",()->test.getAge());
+        evaluateBlock("""
+                def haha='ni hao a';
+                T(java.lang.System).out.println(#haha);
+                def name=2;
+                def col=[12,54,65];
+                T(java.lang.System).out.println(`[12,54,65][1]==#name?#col:'don't know'`);
+                """);
+//        evaluate("""
+//                def abc=asdasdasd;
+//
+//                abc==sfd;
+//                if a==23:
+//
+//                for i in range:
+//                abc={}
+//                ;
+//
+//                """);
+
+//        scan();
+
+        //try {
+        //                                return token.calculateResult(ANY_TYPE);
+        //                            } catch (Exception e) {
+        //                                throw new EvaluateException("calculate ? result failed",e).errToken(token);
+        //                            }
+    }
+
+    @SuppressWarnings("InfiniteLoopStatement")
+    @SneakyThrows
+    public static void scan() {
+        Scanner scanner = new Scanner(System.in);
+        while (true) {
+            System.out.print("EL-commander-line@FNU # ");
+            String line = scanner.nextLine();
+            evaluate(line);
+            System.out.println("\n\n");
+        }
     }
 
     @SafeVarargs
@@ -89,7 +137,28 @@ public class Main {
             }
             System.out.println(new PlaceholderParser("?", "======>relevant expression>>>>>>>>" + expression + "======>relevantStr>>>>>>>>>>>>>>>>>" + joiner + ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>").configPlaceholderHighLight(PlaceholderParser.PlaceholderHighLight.HIGH_LIGHT_CYAN));
             Expression ex = passer.parseExpression(expression);
-            System.out.println(new PlaceholderParser("?", ex.getValue(context)).configPlaceholderHighLight(PlaceholderParser.PlaceholderHighLight.HIGH_LIGHT_YELLOW));
+            System.out.println(new PlaceholderParser("?*", ex.getValue(context)).configPlaceholderHighLight(PlaceholderParser.PlaceholderHighLight.HIGH_LIGHT_YELLOW));
+            joiner = new StringJoiner(",", "(", ")");
+            for (Supplier<Object> supplier : suppliers) {
+                joiner.add(String.valueOf(supplier.get()));
+            }
+            System.out.println(new PlaceholderParser("?", "======>relevantStr>>>>>>>>>>>>>>>>>" + joiner + ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n\n").configPlaceholderHighLight(PlaceholderParser.PlaceholderHighLight.HIGH_LIGHT_CYAN));
+        } catch (Exception e) {
+            e.printStackTrace();
+            Thread.sleep(1000);
+        }
+    }
+
+    @SafeVarargs
+    public static void evaluateBlock(String expression, Supplier<Object>... suppliers) throws InterruptedException {
+        try {
+            StringJoiner joiner = new StringJoiner(",", "(", ")");
+            for (Supplier<Object> supplier : suppliers) {
+                joiner.add(String.valueOf(supplier.get()));
+            }
+            System.out.println(new PlaceholderParser("?", "======>relevant expression>>>>>>>>" + expression + "======>relevantStr>>>>>>>>>>>>>>>>>" + joiner + ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>").configPlaceholderHighLight(PlaceholderParser.PlaceholderHighLight.HIGH_LIGHT_CYAN));
+            BlockExpression ex = passer.parseExpressionBlock(expression);
+            ex.execute(context);
             joiner = new StringJoiner(",", "(", ")");
             for (Supplier<Object> supplier : suppliers) {
                 joiner.add(String.valueOf(supplier.get()));

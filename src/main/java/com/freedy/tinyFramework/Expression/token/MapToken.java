@@ -4,14 +4,14 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.annotation.JSONType;
 import com.freedy.tinyFramework.Expression.Expression;
-import com.freedy.tinyFramework.Expression.TokenStream;
 import com.freedy.tinyFramework.Expression.Tokenizer;
 import com.freedy.tinyFramework.exception.EvaluateException;
 import com.freedy.tinyFramework.exception.IllegalArgumentException;
 import com.freedy.tinyFramework.utils.ReflectionUtils;
 import com.freedy.tinyFramework.utils.StringUtils;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
@@ -24,10 +24,11 @@ import java.util.regex.Pattern;
  * @author Freedy
  * @date 2021/12/14 15:52
  */
-@Data
-@EqualsAndHashCode(callSuper = true)
-@JSONType(includes = {"type","value"})
-public class MapToken extends Token {
+@Getter
+@Setter
+@NoArgsConstructor
+@JSONType(includes = {"type", "value"})
+public final class MapToken extends Token {
     private String mapStr;
     private String relevantOpsName;
     private final Pattern strPattern = Pattern.compile("^'(.*?)'$");
@@ -38,33 +39,42 @@ public class MapToken extends Token {
 
     @Override
     protected Object doCalculate(Class<?> desiredType) {
-        if (ReflectionUtils.isSonInterface(desiredType, "java.util.Map")) {
-            if (StringUtils.hasText(relevantOpsName)) {
-                throw new EvaluateException("relevant ops [?] are not allow", relevantOpsName).errStr(relevantOpsName);
+        try {
+            if (ReflectionUtils.isSonInterface(desiredType, "java.util.Map")) {
+                if (StringUtils.hasText(relevantOpsName)) {
+                    throw new EvaluateException("relevant ops [?] are not allow", relevantOpsName).errToken(this.errStr(relevantOpsName));
+                }
+                //没指定泛型的map
+                JSONObject jsonObject = JSON.parseObject(mapStr);
+                HashMap<String, String> map = new HashMap<>();
+                for (String s : jsonObject.keySet()) {
+                    map.put(s, jsonObject.getString(s));
+                }
+                return checkAndSelfOps(map);
+
+            } else {
+                //具体值
+                JSONObject jsonObject = JSON.parseObject(mapStr);
+                if (StringUtils.isEmpty(relevantOpsName)) {
+                    HashMap<String, String> map = new HashMap<>();
+                    for (String s : jsonObject.keySet()) {
+                        map.put(s, jsonObject.getString(s));
+                    }
+                    return checkAndSelfOps(map);
+                } else {
+                    Matcher matcher = strPattern.matcher(relevantOpsName);
+                    if (matcher.find()) {
+                        return checkAndSelfOps(ReflectionUtils.convertType(jsonObject.getString(matcher.group(1)), desiredType));
+                    }
+                    checkContext();
+                    //解析字串
+                    Expression expression = new Expression(Tokenizer.getTokenStream(relevantOpsName));
+                    String key = expression.getValue(context, String.class);
+                    return checkAndSelfOps(ReflectionUtils.convertType(jsonObject.getString(key), desiredType));
+                }
             }
-            //没指定泛型的map
-            JSONObject jsonObject = JSON.parseObject(mapStr);
-            HashMap<String, String> map = new HashMap<>();
-            for (String s : jsonObject.keySet()) {
-                map.put(s, jsonObject.getString(s));
-            }
-            return checkAndSelfOps(map);
-        } else {
-            //具体值
-            if (StringUtils.isEmpty(relevantOpsName)) {
-                throw new EvaluateException("need relevant ops ?[ops]", value).errStr(value);
-            }
-            JSONObject jsonObject = JSON.parseObject(mapStr);
-            Matcher matcher = strPattern.matcher(relevantOpsName);
-            if (matcher.find()) {
-                return checkAndSelfOps(ReflectionUtils.convertType(jsonObject.getString(matcher.group(1)), desiredType));
-            }
-            checkContext();
-            //解析字串
-            TokenStream tokenStream = new Tokenizer().getTokenStream(relevantOpsName);
-            Expression expression = new Expression(tokenStream);
-            String key = expression.getValue(context, String.class);
-            return checkAndSelfOps(ReflectionUtils.convertType(jsonObject.getString(key), desiredType));
+        } catch (Exception e) {
+            throw new EvaluateException("do calculate failed", e).errToken(this);
         }
     }
 

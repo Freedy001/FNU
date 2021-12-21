@@ -1,34 +1,24 @@
 package com.freedy.tinyFramework.Expression.token;
 
 import com.alibaba.fastjson.annotation.JSONType;
-import com.freedy.tinyFramework.Expression.Expression;
-import com.freedy.tinyFramework.Expression.TokenStream;
-import com.freedy.tinyFramework.Expression.Tokenizer;
 import com.freedy.tinyFramework.exception.EvaluateException;
 import com.freedy.tinyFramework.utils.ReflectionUtils;
 import com.freedy.tinyFramework.utils.StringUtils;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
-import java.lang.reflect.Method;
 import java.lang.reflect.Type;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * @author Freedy
  * @date 2021/12/14 15:51
  */
-@Data
-@EqualsAndHashCode(callSuper = true)
-@JSONType(includes = {"type","value"})
-public class ReferenceToken extends ClassToken {
-    private String referenceName;
-    private final Pattern strPattern = Pattern.compile("^'(.*?)'$");
-    private final Pattern numeric = Pattern.compile("\\d+|\\d+[lL]");
-
+@Getter
+@Setter
+@NoArgsConstructor
+@JSONType(includes = {"type", "value", "nullCheck", "propertyName", "methodArgs"})
+public final class ReferenceToken extends ClassToken {
 
     public ReferenceToken(String token) {
         super("reference", token);
@@ -36,62 +26,39 @@ public class ReferenceToken extends ClassToken {
 
     @Override
     protected Object doCalculate(Class<?> desiredType) {
-        if (StringUtils.isEmpty(referenceName)) {
-            throw new EvaluateException("reference is null");
-        }
-        checkContext();
-        if (StringUtils.hasText(propertyName)) {
-            Object variable = context.getVariable(referenceName);
-            if (variable == null) {
-                throw new EvaluateException("can not calculate,because reference can not find a variable in context").errStr(referenceName);
-            }
-            return checkAndSelfOps(ReflectionUtils.getter(variable, propertyName));
-        }
-        try {
-            if (StringUtils.hasText(methodName)) {
-                Object variable = context.getVariable(referenceName);
-                if (variable == null) {
-                    throw new EvaluateException("can not calculate,because reference can not find a variable in context").errStr(referenceName);
-                }
-                List<Object> args = new ArrayList<>();
-                for (String methodArg : methodArgs) {
-                    Matcher matcher = strPattern.matcher(methodArg);
-                    if (matcher.find()){
-                        args.add(matcher.group(1));
-                        continue;
-                    }
-                    matcher=numeric.matcher(methodArg);
-                    if (matcher.matches()){
-                        args.add(methodArg.matches(".*?[lL]$")?Long.parseLong(methodArg):Integer.parseInt(methodArg));
-                        continue;
-                    }
-                    TokenStream stream = Tokenizer.getTokenStream(methodArg);
-                    Expression expression = new Expression(stream);
-                    args.add(expression.getValue(context));
-                }
-                Method method = variable.getClass().getMethod(methodName, args.stream().map(Object::getClass).toArray(Class[]::new));
-                method.setAccessible(true);
-                return checkAndSelfOps(method.invoke(variable,args.toArray()));
-            }else {
-                //todo
-                throw new EvaluateException("can not calculate,methodName and propertyName is null!").errStr(value);
-            }
-        } catch (Exception e) {
-            throw new EvaluateException("invoke target method failed,because ?",e);
-        }
+        Object variable = getVariable();
+        if (variable == null) return null;
+        return checkAndSelfOps(executeChain(variable.getClass(), variable, executableCount));
     }
+
 
     @Override
     public void assignFrom(Token assignment) {
-        checkContext();
-        if (StringUtils.isAnyEmpty(referenceName, propertyName)) {
-            throw new EvaluateException("can not assign,because reference or property is null");
+        String propertyName = getLastPropertyName();
+        if (propertyName == null) {
+            Object result = assignment.calculateResult(Token.ANY_TYPE);
+            context.setVariable(reference, result);
+            return;
         }
-        Object variable = context.getVariable(referenceName);
+        Object variable = getVariable();
         if (variable == null) {
-            throw new EvaluateException("can not assign,because reference can not find a variable in context");
+            throw new EvaluateException("there is no ? in the context", reference).errToken(this.errStr(reference));
         }
+        variable = executeChain(variable.getClass(), variable, executableCount - 1);
         Type desiredType = ReflectionUtils.getFieldRecursion(variable.getClass(), propertyName).getGenericType();
-        ReflectionUtils.setter(variable, propertyName, assignment.calculateResult(desiredType));
+        Object result = assignment.calculateResult(desiredType);
+        ReflectionUtils.setter(variable, propertyName, result);
+    }
+
+    private Object getVariable() {
+        if (StringUtils.isEmpty(reference)) {
+            throw new EvaluateException("reference is null");
+        }
+        checkContext();
+        Object variable = context.getVariable(reference);
+        if (!checkMode && variable == null) {
+            throw new EvaluateException("there is no ? in the context", reference).errToken(this.errStr(reference));
+        }
+        return variable;
     }
 }

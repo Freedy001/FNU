@@ -1,6 +1,7 @@
 package com.freedy.tinyFramework.exception;
 
 import com.freedy.tinyFramework.utils.PlaceholderParser;
+import com.freedy.tinyFramework.utils.StringUtils;
 import lombok.SneakyThrows;
 
 import java.lang.reflect.Field;
@@ -22,6 +23,18 @@ public class BeanException extends RuntimeException {
     @SneakyThrows
     public BeanException(String msg, Object... placeholder) {
         Class<Throwable> aClass = Throwable.class;
+        //设置cause
+        for (int i = 0; i < placeholder.length; i++) {
+            Object o = placeholder[i];
+            if (o instanceof Throwable e) {
+                Field cause = aClass.getDeclaredField("cause");
+                cause.setAccessible(true);
+                cause.set(this, o);
+                placeholder[i] = StringUtils.hasText(e.getMessage()) ? e.getMessage() : e.getClass().getSimpleName();
+                break;
+            }
+        }
+
         //设置msg
         Field exceptionMsg;
         exceptionMsg = aClass.getDeclaredField("detailMessage");
@@ -30,14 +43,5 @@ public class BeanException extends RuntimeException {
                 .configPlaceholderHighLight(PlaceholderParser.PlaceholderHighLight.HIGH_LIGHT_CYAN)
                 .registerNoneHighLightClass(Throwable.class)
                 .toString());
-        //设置cause
-        for (Object o : placeholder) {
-            if (o instanceof Throwable) {
-                Field cause = aClass.getDeclaredField("cause");
-                cause.setAccessible(true);
-                cause.set(this, o);
-                break;
-            }
-        }
     }
 }

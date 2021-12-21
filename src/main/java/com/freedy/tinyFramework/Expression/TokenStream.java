@@ -13,7 +13,7 @@ import java.util.*;
  * @author Freedy
  * @date 2021/12/14 19:46
  */
-public class TokenStream {
+public class TokenStream implements Executable {
     @Getter
     private final List<Token> infixExpression = new ArrayList<>();
     private static final Set<String> doubleOps = Set.of("||", "&&", "!=", "==", ">=", "<=", "++", "--", "+=", "-=", "/=", "*=");
@@ -21,13 +21,16 @@ public class TokenStream {
     private static final Set<String> single2TokenOps = Set.of("+++", "---");
     private static final Set<String> singleOps = Set.of("++", "--", "!");
     private static final List<Set<String>> priorityOps = Arrays.asList(
-            Set.of("=", ">", "<", "||", "&&", "==", "!=", ">=", "<="),
+            Set.of("=", "||", "&&"),
+            Set.of("?"),
+            Set.of(">", "<", ">=", "<=", "==", "!="),
             Set.of("+", "-", "+=", "-="),
             Set.of("*", "/"),
-            singleOps
+            Set.of(".")
     );//从上往下 优先级逐渐变大
     @Getter
     private final String expression;
+    private final Map<String, Object> variableMap=new HashMap<>();
 
     // b<a=2+3+(5*4/2)
     // ba2=
@@ -88,11 +91,18 @@ public class TokenStream {
     }
 
 
+    int bracketsPares = 0;
+
     public void addBracket(boolean isLeft) {
         if (isLeft) {
             infixExpression.add(new OpsToken("("));
+            bracketsPares++;
         } else {
+            if (bracketsPares == 0) {
+                ExpressionSyntaxException.thrWithMsg("brackets are not paired!", expression, infixExpression.get(infixExpression.size() - 1).getValue() + "@)");
+            }
             infixExpression.add(new OpsToken(")"));
+            bracketsPares--;
         }
     }
 
@@ -101,7 +111,21 @@ public class TokenStream {
     }
 
     public void setEachTokenContext(EvaluationContext context) {
-        infixExpression.forEach(item -> item.setContext(context));
+        setContext(context,infixExpression);
+    }
+
+    private void setContext(EvaluationContext context, List<Token> tokenList) {
+        for (Token token : tokenList) {
+            List<Token> originToken = token.getOriginToken();
+            if (originToken != null) {
+                setContext(context, originToken);
+            }
+            token.setContext(context);
+        }
+    }
+
+    public Token getLastToken() {
+        return infixExpression.get(infixExpression.size() - 1);
     }
 
     // b<a=2+3+(5*4/2)
@@ -109,7 +133,7 @@ public class TokenStream {
     // <=+
     public List<Token> calculateSuffix() {
         //计算偏移量
-        calculateOffset();
+        calculateOffset(0, infixExpression);
         //合并单值操作
         mergeSingleTokenOps();
         List<Token> suffixExpression = new ArrayList<>();
@@ -119,10 +143,14 @@ public class TokenStream {
             if (token.isType("operation")) {
                 Token pop;
                 if (token.isValue(")")) {
-                    while (!(pop = opsStack.pop()).isValue("(")) {
-                        suffixExpression.add(pop);
+                    try {
+                        while (!(pop = opsStack.pop()).isValue("(")) {
+                            suffixExpression.add(pop);
+                        }
+                        continue;
+                    } catch (EmptyStackException e) {
+                        ExpressionSyntaxException.tokenThr("brackets are not paired!", expression, token);
                     }
-                    continue;
                 }
                 while (true) {
                     pop = opsStack.isEmpty() ? null : opsStack.peek();
@@ -202,17 +230,43 @@ public class TokenStream {
 
     }
 
-    private void calculateOffset() {
-        String expression = this.expression;
-        int cursor = 0;
-        for (Token token : infixExpression) {
-            String value = token.getValue();
-            int strOffset = expression.indexOf(value);
-            token.setOffset(cursor + strOffset);
-            int cutIndex = strOffset + value.length();
-            expression = expression.substring(cutIndex);
-            cursor += cutIndex;
+
+    private void calculateOffset(int cursor, List<Token> tokenList) {
+        for (Token token : tokenList) {
+            List<Token> originToken = token.getOriginToken();
+            if (originToken != null) {
+                calculateOffset(cursor, originToken);
+            }
+            int[] index = findSubStrIndex(expression, token.getValue(), cursor);
+            assert index != null;
+            token.setOffset(index[0]);
+            cursor = index[1];
         }
+    }
+
+
+    @SuppressWarnings("StatementWithEmptyBody")
+    private int[] findSubStrIndex(String str, String subStr, int startIndex) {
+        char[] chars = str.toCharArray();
+        int len = chars.length;
+        char[] subChars = subStr.toCharArray();
+        int subLen = subChars.length;
+        for (int i = startIndex; i < len; i++) {
+            if (chars[i] == ' ') continue;
+            int start = i;
+            for (int j = 0; j < subLen; j++, i++) {
+                for (; chars[i] == ' '; i++) ;
+                for (; subChars[j] == ' '; j++) ;
+                if (chars[i] != subChars[j]) {
+                    break;
+                } else {
+                    if (j == subLen - 1) {
+                        return new int[]{start, i + 1};
+                    }
+                }
+            }
+        }
+        return null;
     }
 
 }

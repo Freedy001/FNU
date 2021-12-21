@@ -33,12 +33,18 @@ public class StanderEvaluationContext implements EvaluationContext {
 
     @Override
     public Object setVariable(String name, Object variable) {
+        if (name.equals("root")) {
+            root = variable;
+        }
         return variableMap.put(name, variable);
     }
 
     @Override
     public Object getVariable(String name) {
         try {
+            if (name.equals("root")) {
+                return root;
+            }
             return variableMap.get(name);
         } catch (Exception e) {
             throw new IllegalArgumentException("get variable ? failed,because ?",name, e);
