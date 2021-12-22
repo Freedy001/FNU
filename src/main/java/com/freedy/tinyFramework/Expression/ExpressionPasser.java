@@ -7,13 +7,8 @@ package com.freedy.tinyFramework.Expression;
 public class ExpressionPasser {
 
 
-
     public Expression parseExpression(String expression) {
         return new Expression(Tokenizer.getTokenStream(expression));
-    }
-
-    public BlockExpression parseExpressionBlock(String expression) {
-        return new BlockExpression(Tokenizer.getTokenStreamList(expression));
     }
 
 

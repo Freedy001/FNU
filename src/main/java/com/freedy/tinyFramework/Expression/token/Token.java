@@ -26,7 +26,7 @@ import java.util.*;
 @AllArgsConstructor
 @JSONType(includes = {"type", "value"})
 public sealed abstract class Token implements Comparable, Executable
-        permits BasicVarToken, ClassToken, CollectionToken, MapToken, NormalVarToken, ObjectToken, OpsToken, TernaryToken, WrapperToken {
+        permits BasicVarToken, BlockToken, ClassToken, CollectionToken, LoopToken, MapToken, NormalVarToken, ObjectToken, OpsToken, TernaryToken, WrapperToken {
     @ToString.Include
     protected String type;
     @ToString.Include
@@ -186,26 +186,31 @@ public sealed abstract class Token implements Comparable, Executable
 
 
     public String numSelfOps(Token o, Token type) {
-        BigDecimal a;
-        BigDecimal b;
+        Object o1;
+        Object o2;
         try {
-            Object o1 = calculateResult(Number.class);
-            if (o1==null){
+            o1 = calculateResult(Object.class);
+            if (o1 == null) {
                 throw new EvaluateException("can not operation on null").errToken(this);
             }
-            a = new BigDecimal(o1 + "");
         } catch (Exception e) {
             throw new EvaluateException("incomparable token,cause ?", e).errToken(this);
         }
         try {
-            Object o1 = o.calculateResult(Number.class);
-            if (o1==null){
+            o2 = o.calculateResult(Object.class);
+            if (o2 == null) {
                 throw new EvaluateException("can not operation on null").errToken(o);
             }
-            b = new BigDecimal(o1 + "");
         } catch (Exception e) {
             throw new EvaluateException("incomparable token,cause ?", e).errToken(o);
         }
+        if (type.isValue("+")) {
+            if (o1 instanceof String || o2 instanceof String) {
+                return "string@" + o1 + o2;
+            }
+        }
+        BigDecimal a = new BigDecimal(o1 + "");
+        BigDecimal b = new BigDecimal(o1 + "");
         switch (type.getValue()) {
             case "+" -> {
                 return a.add(b).toString();

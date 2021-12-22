@@ -1,42 +1,45 @@
 package com.freedy.tinyFramework.Expression;
 
-import com.alibaba.fastjson.JSON;
 import com.freedy.tinyFramework.Expression.token.*;
 import com.freedy.tinyFramework.exception.EvaluateException;
 import com.freedy.tinyFramework.exception.ExpressionSyntaxException;
 import com.freedy.tinyFramework.exception.IllegalArgumentException;
 import com.freedy.tinyFramework.utils.ReflectionUtils;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Stack;
 
+import static com.freedy.tinyFramework.Expression.token.Token.ANY_TYPE;
+
 /**
  * @author Freedy
  * @date 2021/12/14 11:18
  */
+@NoArgsConstructor
 public class Expression {
     private String expression;
     private TokenStream stream;
     @Getter
     @Setter
-    private EvaluationContext defaultContext;
+    private EvaluationContext context;
 
     public Expression(TokenStream stream) {
         this.stream = stream;
         this.expression = stream.getExpression();
     }
 
-    public Expression(EvaluationContext defaultContext) {
-        this.defaultContext = defaultContext;
+    public Expression(EvaluationContext context) {
+        this.context = context;
     }
 
-    public Expression(TokenStream stream, EvaluationContext defaultContext) {
+    public Expression(TokenStream stream, EvaluationContext context) {
         this.stream = stream;
         this.expression = stream.getExpression();
-        this.defaultContext = defaultContext;
+        this.context = context;
     }
 
     public void setTokenStream(TokenStream stream) {
@@ -45,15 +48,15 @@ public class Expression {
     }
 
     public Object getValue() {
-        return evaluate(Token.ANY_TYPE, defaultContext);
+        return evaluate(ANY_TYPE, context);
     }
 
     public <T> T getValue(Class<T> desiredResultType) {
-        return desiredResultType.cast(evaluate(desiredResultType, defaultContext));
+        return desiredResultType.cast(evaluate(desiredResultType, context));
     }
 
     public Object getValue(EvaluationContext context) {
-        return evaluate(Token.ANY_TYPE, context);
+        return evaluate(ANY_TYPE, context);
     }
 
     public <T> T getValue(EvaluationContext context, Class<T> desiredResultType) {
@@ -61,23 +64,24 @@ public class Expression {
     }
 
 
-    private Object evaluate(Class<?> desired, EvaluationContext context) {
-        stream.setEachTokenContext(context);
-        List<Token> tokenList = stream.calculateSuffix();
+    public Object evaluate(Class<?> desired, EvaluationContext context) {
+        int size = stream.blockSize();
+        Object[] result = new Object[1];
+        stream.forEachStream(context, (i, suffixList) ->
+                result[0] = doEvaluate(suffixList, i == size - 1 ? desired : ANY_TYPE));
+        return result[0];
+    }
 
-        stream.getInfixExpression().forEach(item -> System.out.println(JSON.toJSONString(item)));
-        System.out.println("\n");
-        tokenList.forEach(item -> System.out.println(JSON.toJSONString(item)));
-
+    private Object doEvaluate(List<Token> suffixTokenList, Class<?> desired) {
         Stack<Token> varStack = new Stack<>();
         List<Token> list = new ArrayList<>();
-        for (Token token : tokenList) {
+        for (Token token : suffixTokenList) {
             try {
                 if (token.isType("operation")) {
                     list.add(token);
                     Token token1 = varStack.pop();
                     Token token2 = varStack.pop();
-                    varStack.push(doEvaluate(token, token2, token1));
+                    varStack.push(calculate(token, token2, token1));
                     continue;
                 }
                 varStack.push(token);
@@ -95,7 +99,7 @@ public class Expression {
             try {
                 result = token.calculateResult(desired);
             } catch (ExpressionSyntaxException e) {
-                ExpressionSyntaxException.thrThis(expression,e);
+                ExpressionSyntaxException.thrThis(expression, e);
             } catch (EvaluateException e) {
                 ExpressionSyntaxException.thrEvaluateException(e, expression, token);
             } catch (Exception e) {
@@ -103,12 +107,13 @@ public class Expression {
             }
             return result;
         }
+        if (varStack.size() == 0) return null;
         ExpressionSyntaxException.tokenThr(expression, list.toArray(Token[]::new));
         throw new IllegalArgumentException("unreachable statement");
     }
 
 
-    private Token doEvaluate(Token opsToken, Token t1, Token t2) {
+    private Token calculate(Token opsToken, Token t1, Token t2) {
         switch (opsToken.getValue()) {
             case "." -> {
                 return mergeDotSplit(t1, t2, opsToken);
@@ -182,8 +187,8 @@ public class Expression {
             }
             case "==" -> {
                 boolean flag = false;
-                Object o1 = t1.calculateResult(Token.ANY_TYPE);
-                Object o2 = t2.calculateResult(Token.ANY_TYPE);
+                Object o1 = t1.calculateResult(ANY_TYPE);
+                Object o2 = t2.calculateResult(ANY_TYPE);
                 if (o1 != null && o2 != null) {
                     if (ReflectionUtils.isRegularType(o1.getClass()) && ReflectionUtils.isRegularType(o2.getClass())) {
                         flag = o1.equals(o2);
@@ -205,7 +210,12 @@ public class Expression {
 
 
     private Token numOps(Token t1, Token t2, Token ops) {
-        return new BasicVarToken("numeric", t1.numSelfOps(t2, ops)).setOriginToken(t1, ops, t2).setOffset(t1.getOffset());
+        String selfOps = t1.numSelfOps(t2, ops);
+        if (selfOps.startsWith("string@")) {
+            return new BasicVarToken("str", selfOps.replaceFirst("string@", "")).setOriginToken(t1, ops, t2).setOffset(t1.getOffset());
+        } else {
+            return new BasicVarToken("numeric", selfOps).setOriginToken(t1, ops, t2).setOffset(t1.getOffset());
+        }
     }
 
 

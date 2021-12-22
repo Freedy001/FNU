@@ -1,6 +1,6 @@
 package ExpressionTest;
 
-import com.freedy.tinyFramework.Expression.BlockExpression;
+
 import com.freedy.tinyFramework.Expression.Expression;
 import com.freedy.tinyFramework.Expression.ExpressionPasser;
 import com.freedy.tinyFramework.Expression.StanderEvaluationContext;
@@ -88,13 +88,17 @@ public class Main {
 //        evaluate("#tes?.haha()");
 //        evaluate("def haha='nihao'",()->test.getAge());
 //        evaluate("#haha",()->test.getAge());
-        evaluateBlock("""
-                def haha='ni hao a';
-                T(java.lang.System).out.println(#haha);
-                def name=2;
-                def col=[12,54,65];
-                T(java.lang.System).out.println(`[12,54,65][1]==#name?#col:'don't know'`);
+        evaluate("""
+                def map={'haha':'gege'};
+                for i in 10:({
+                    #map.put({#i+'haha'},'haha');
+                });
+                for entry in #map.entrySet():({
+                    T(java.lang.System).out.println(#entry);
+                });
                 """);
+        System.out.println();
+
 //        evaluate("""
 //                def abc=asdasdasd;
 //
@@ -138,27 +142,6 @@ public class Main {
             System.out.println(new PlaceholderParser("?", "======>relevant expression>>>>>>>>" + expression + "======>relevantStr>>>>>>>>>>>>>>>>>" + joiner + ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>").configPlaceholderHighLight(PlaceholderParser.PlaceholderHighLight.HIGH_LIGHT_CYAN));
             Expression ex = passer.parseExpression(expression);
             System.out.println(new PlaceholderParser("?*", ex.getValue(context)).configPlaceholderHighLight(PlaceholderParser.PlaceholderHighLight.HIGH_LIGHT_YELLOW));
-            joiner = new StringJoiner(",", "(", ")");
-            for (Supplier<Object> supplier : suppliers) {
-                joiner.add(String.valueOf(supplier.get()));
-            }
-            System.out.println(new PlaceholderParser("?", "======>relevantStr>>>>>>>>>>>>>>>>>" + joiner + ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n\n").configPlaceholderHighLight(PlaceholderParser.PlaceholderHighLight.HIGH_LIGHT_CYAN));
-        } catch (Exception e) {
-            e.printStackTrace();
-            Thread.sleep(1000);
-        }
-    }
-
-    @SafeVarargs
-    public static void evaluateBlock(String expression, Supplier<Object>... suppliers) throws InterruptedException {
-        try {
-            StringJoiner joiner = new StringJoiner(",", "(", ")");
-            for (Supplier<Object> supplier : suppliers) {
-                joiner.add(String.valueOf(supplier.get()));
-            }
-            System.out.println(new PlaceholderParser("?", "======>relevant expression>>>>>>>>" + expression + "======>relevantStr>>>>>>>>>>>>>>>>>" + joiner + ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>").configPlaceholderHighLight(PlaceholderParser.PlaceholderHighLight.HIGH_LIGHT_CYAN));
-            BlockExpression ex = passer.parseExpressionBlock(expression);
-            ex.execute(context);
             joiner = new StringJoiner(",", "(", ")");
             for (Supplier<Object> supplier : suppliers) {
                 joiner.add(String.valueOf(supplier.get()));

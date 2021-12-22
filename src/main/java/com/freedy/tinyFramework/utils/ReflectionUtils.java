@@ -596,7 +596,7 @@ public class ReflectionUtils {
                 argString.add(arg.getType().getSimpleName() + " " + arg.getName());
             }
             return method.getName() + argString;
-        }).toArray()).serialParamsSplit(" , "));
+        }).toList()).serialParamsSplit(" , ").ifEmptyFillWith("not find matched method"));
     }
 
     @SneakyThrows

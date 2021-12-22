@@ -8,6 +8,7 @@ import com.freedy.tinyFramework.exception.ExpressionSyntaxException;
 import lombok.Getter;
 
 import java.util.*;
+import java.util.function.BiConsumer;
 
 /**
  * @author Freedy
@@ -15,7 +16,7 @@ import java.util.*;
  */
 public class TokenStream implements Executable {
     @Getter
-    private final List<Token> infixExpression = new ArrayList<>();
+    protected List<Token> infixExpression = new ArrayList<>();
     private static final Set<String> doubleOps = Set.of("||", "&&", "!=", "==", ">=", "<=", "++", "--", "+=", "-=", "/=", "*=");
     private static final Set<String> permitOps = Set.of("=!", "||!", "&&!", "==!", ">++", "<++", ">=++", "<=++", ">--", "<--", ">=--", "<=--", "+-", "-+", "++-", "--+");
     private static final Set<String> single2TokenOps = Set.of("+++", "---");
@@ -29,8 +30,7 @@ public class TokenStream implements Executable {
             Set.of(".")
     );//从上往下 优先级逐渐变大
     @Getter
-    private final String expression;
-    private final Map<String, Object> variableMap=new HashMap<>();
+    protected final String expression;
 
     // b<a=2+3+(5*4/2)
     // ba2=
@@ -38,6 +38,34 @@ public class TokenStream implements Executable {
     public TokenStream(String expression) {
         this.expression = expression;
     }
+
+    private final List<List<Token>> blockStream = new LinkedList<>();
+
+
+    public void splitStream() {
+        blockStream.add(infixExpression);
+        infixExpression = new ArrayList<>();
+    }
+
+    public List<Token> next(EvaluationContext context) {
+        if (blockStream.size() == 0) return null;
+        infixExpression = blockStream.remove(0);
+        setEachTokenContext(context);
+        return calculateSuffix();
+    }
+
+    public void forEachStream(EvaluationContext context, BiConsumer<Integer, List<Token>> indexSuffixList) {
+        for (int i = 0; i < blockStream.size(); i++) {
+            infixExpression = blockStream.get(i);
+            setEachTokenContext(context);
+            indexSuffixList.accept(i,calculateSuffix());
+        }
+    }
+
+    public int blockSize(){
+        return blockStream.size();
+    }
+
 
     public static int opsPriority(String ops) {
         for (int i = 0; i < priorityOps.size(); i++) {
@@ -254,9 +282,14 @@ public class TokenStream implements Executable {
         for (int i = startIndex; i < len; i++) {
             if (chars[i] == ' ') continue;
             int start = i;
-            for (int j = 0; j < subLen; j++, i++) {
-                for (; chars[i] == ' '; i++) ;
-                for (; subChars[j] == ' '; j++) ;
+            for (int j = 0; ; j++, i++) {
+                for (; i < len && chars[i] == ' '; i++) ;
+                for (; j < subLen && subChars[j] == ' '; j++) ;
+                if (i == len && j == subLen) {
+                    return new int[]{start, i};
+                } else if (i == len || j == subLen) {
+                    break;
+                }
                 if (chars[i] != subChars[j]) {
                     break;
                 } else {
@@ -265,6 +298,7 @@ public class TokenStream implements Executable {
                     }
                 }
             }
+
         }
         return null;
     }

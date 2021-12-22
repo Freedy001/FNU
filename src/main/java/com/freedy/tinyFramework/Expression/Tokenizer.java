@@ -4,11 +4,13 @@ import com.freedy.tinyFramework.Expression.token.*;
 import com.freedy.tinyFramework.exception.ExpressionSyntaxException;
 import com.freedy.tinyFramework.utils.StringUtils;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Set;
+import java.util.StringJoiner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 /**
  * @author Freedy
@@ -24,7 +26,7 @@ public class Tokenizer {
     //      static                                                    [1,2,3,4] [1]
     private static final Pattern collectionPattern = Pattern.compile("^(?!\\{.*?}) *?\\[(.*?)](?: *?\\[(.*)])?");
     //      static                                             {a:b,c:d} [2]
-    private static final Pattern mapPattern = Pattern.compile("(\\{.*?})(?: *?\\[(.*)])?");
+    private static final Pattern mapPattern = Pattern.compile("^(\\{.*?})(?: *?\\[(.*)])?");
 
     private static final Pattern strPattern = Pattern.compile("^'(.*?)'$");
 
@@ -32,46 +34,90 @@ public class Tokenizer {
 
     private static final Pattern boolPattern = Pattern.compile("true|false");
 
-    private static final Pattern methodPattern = Pattern.compile("(.*?)\\((.*?)\\)");
+    private static final Pattern methodPattern = Pattern.compile("(.*?)\\((.*)\\)");
     //      static                                         T  (java.lang.Math) . ?  pow      (  3 ,    2 )
-    private static final Pattern expressionBracket = Pattern.compile(".*?T *?\\($|.*?\\..*?\\w+ *?\\($");
+    private static final Pattern expressionBracket = Pattern.compile(".*?T *?\\($|.*?\\. *?\\w+ *?\\($|^for +(.*?) +in +(.*?) *?: *?\\($");
     //      static                                       以[a-zA-Z0-9_]开头
     private static final Pattern varPattern = Pattern.compile("^[a-zA-Z_]\\w*");
 
     private static final Pattern defPattern = Pattern.compile("^def +?(.*)");
+    //                         for i in 100:(// do some thing)
+    private static final Pattern loopPattern = Pattern.compile("^for +(.*?) +in +(.*?) *?: *?\\((.*)\\)");
+
     //[<=>| static !+_*?()]
     private static final Set<Character> operationSet = Set.of('=', '<', '>', '|', '&', '!', '+', '-', '*', '/', '(', ')', '?');
     private static final Set<Character> bracket = Set.of('(', ')');
 
 
-    public static List<TokenStream> getTokenStreamList(String crossLineEl) {
-        return Arrays.stream(crossLineEl.replaceAll("\r\n|\n", " ")
-                .split(";")).map(Tokenizer::getTokenStream).collect(Collectors.toCollection(LinkedList::new));
+    public static TokenStream getTokenStream(String expression) {
+        //处理注释
+        StringJoiner joiner = new StringJoiner(" ");
+        for (String sub : expression.split("\n")) {
+            int i1 = sub.indexOf("//");
+            sub = sub.substring(0, i1 == -1 ? sub.length() : i1).trim();
+            joiner.add(sub);
+        }
+        return doGetTokenStream(joiner.toString());
     }
 
-    public static TokenStream getTokenStream(String expression) {
-        TokenStream tokenStream = new TokenStream(expression);
+
+    @NotNull
+    private static TokenStream doGetTokenStream(String expression) {
+        TokenStream stream = new TokenStream(expression);
+        return doGetTokenStream(expression, stream);
+    }
+
+    private static TokenStream doGetTokenStream(String expression, TokenStream tokenStream) {
+        String[] bracket = splitWithoutBracket(expression, '{', '}', ';');
+        for (String sub : bracket) {
+            if (StringUtils.isEmpty(sub)) continue;
+            if (sub.startsWith("{") && sub.endsWith("}")) {
+                sub = sub.substring(1, sub.length() - 1);
+                doGetTokenStream(sub, tokenStream);
+            } else {
+                parseExpression(sub, tokenStream);
+                tokenStream.splitStream();
+            }
+        }
+        return tokenStream;
+    }
+
+
+    private static void parseExpression(String expression, TokenStream tokenStream) {
+
+        if (StringUtils.isEmpty(expression)) return;
 
         char[] chars = expression.toCharArray();
         final int length = chars.length;
 
         int lastOps = 0;
-        boolean expressionBracket = false;
+        int expressionLeftBracket = 0;
 
-        boolean insideSubBracket = false;
-        int subBracketCounter = 0;
-        int totalBracket = getSubElBracketCount(expression);
+        boolean quoteInside = false;
+        int leftSubBracketCount = 0;
 
         for (int i = 0; i < length; i++) {
             char inspectChar = chars[i];
 
-            if (inspectChar == '`') {
-                subBracketCounter++;
-                insideSubBracket = subBracketCounter != totalBracket;
+            if (inspectChar == '{') {
+                leftSubBracketCount++;
+                continue;
+            }
+
+            if (inspectChar == '}') {
+                leftSubBracketCount--;
+                continue;
+            }
+
+            if (leftSubBracketCount > 0) continue;
+
+            if (inspectChar == '\'') {
+                quoteInside = !quoteInside;
+                continue;
             }
 
 
-            if (inspectChar == ' ' || !operationSet.contains(inspectChar) || insideSubBracket) {
+            if (inspectChar == ' ' || !operationSet.contains(inspectChar) || quoteInside) {
                 continue;
             }
 
@@ -104,7 +150,7 @@ public class Tokenizer {
                 //构建token
                 if (inspectChar == '(') {
                     if (Tokenizer.expressionBracket.matcher(expression.substring(lastOps, i + 1).trim()).matches()) {
-                        expressionBracket = true;
+                        expressionLeftBracket++;
                         continue;
                     }
                     if (StringUtils.hasText(token)) {
@@ -113,8 +159,8 @@ public class Tokenizer {
                     tokenStream.addBracket(true);
                 }
                 if (inspectChar == ')') {
-                    if (expressionBracket) {
-                        expressionBracket = false;
+                    if (expressionLeftBracket > 0) {
+                        expressionLeftBracket--;
                         continue;
                     }
                     buildToken(tokenStream, token);
@@ -145,8 +191,8 @@ public class Tokenizer {
         buildToken(tokenStream, token);
 
 
-        return tokenStream;
     }
+
 
     //a==b? b==c?1:b==c?1:2 : b==c?1:2
     private static TernaryToken buildTernary(String expression, int[] i) {
@@ -194,8 +240,8 @@ public class Tokenizer {
         }
         TernaryToken token = new TernaryToken(expression.substring(i[0] + 1, end));
         try {
-            token.setTrueTokenStream(getTokenStream(expression.substring(i[0] + 1, divide)));
-            token.setFalseTokenStream(getTokenStream(expression.substring(divide + 1, end)));
+            token.setTrueTokenStream(doGetTokenStream(expression.substring(i[0] + 1, divide)));
+            token.setFalseTokenStream(doGetTokenStream(expression.substring(divide + 1, end)));
         } catch (ExpressionSyntaxException e) {
             new ExpressionSyntaxException(expression)
                     .buildErrorStr(e.getSyntaxErrStr().toArray(new String[0]))
@@ -221,11 +267,8 @@ public class Tokenizer {
             for (String ele : group.split(",")) {
                 String newEle = ele.trim();
                 if (StringUtils.hasText(newEle)) {
-                    if (newEle.startsWith("`") && newEle.endsWith("`")) {
-                        newEle = newEle.substring(1, newEle.length() - 1);
-                    }
                     try {
-                        TokenStream stream = getTokenStream(newEle);
+                        TokenStream stream = doGetTokenStream(newEle);
                         collectionToken.addTokenStream(stream);
                     } catch (ExpressionSyntaxException e) {
                         new ExpressionSyntaxException(expression)
@@ -238,12 +281,18 @@ public class Tokenizer {
                 }
             }
 
-            String ops = matcher.group(2);
-            if (StringUtils.hasText(ops)) {
-                if (ops.startsWith("`") && ops.endsWith("`")) {
-                    ops = ops.substring(1, ops.length() - 1);
+            try {
+                String ops = matcher.group(2);
+                if (StringUtils.hasText(ops)) {
+                    collectionToken.setRelevantOps(doGetTokenStream(ops));
                 }
-                collectionToken.setRelevantOps(getTokenStream(ops));
+            } catch (ExpressionSyntaxException e) {
+                new ExpressionSyntaxException(expression)
+                        .buildMsg("sub expression error!")
+                        .buildErrorStr(e.getSyntaxErrStr().toArray(new String[0]))
+                        .buildCause(e)
+                        .buildConsoleErrorMsg()
+                        .thr();
             }
 
             tokenStream.addToken(collectionToken);
@@ -256,6 +305,34 @@ public class Tokenizer {
             mapToken.setMapStr(matcher.group(1));
             mapToken.setRelevantOpsName(matcher.group(2));
             tokenStream.addToken(mapToken);
+            return;
+        }
+        //构建loop Token
+        matcher = loopPattern.matcher(token);
+        if (matcher.find()) {
+            LoopToken loopToken = new LoopToken(token);
+            String variableName = matcher.group(1);
+            if (StringUtils.isEmpty(variableName)) {
+                ExpressionSyntaxException.thrWithMsg("loop variable can not be empty", expression, "for in");
+            }
+            loopToken.setVariableName(variableName);
+            String executeEl = matcher.group(2);
+            if (StringUtils.isEmpty(executeEl)) {
+                ExpressionSyntaxException.thrWithMsg("executable part can not be empty", expression, "in :");
+            }
+            try {
+                loopToken.setExecuteTokenStream(doGetTokenStream(executeEl));
+                loopToken.setLoopTokenStream(doGetTokenStream(matcher.group(3)));
+            } catch (ExpressionSyntaxException e) {
+                new ExpressionSyntaxException(expression)
+                        .buildErrorStr(e.getSyntaxErrStr().toArray(new String[0]))
+                        .buildToken(e.getLayer().toArray(new Token[0]))
+                        .buildMsg("sub expression err")
+                        .buildCause(e)
+                        .buildConsoleErrorMsg()
+                        .thr();
+            }
+            tokenStream.addToken(loopToken);
             return;
         }
         //构建static Token
@@ -311,6 +388,7 @@ public class Tokenizer {
                 return;
             }
         }
+        //构建def token
         matcher = defPattern.matcher(token);
         if (matcher.find()) {
             ObjectToken objectToken = new ObjectToken(token);
@@ -363,7 +441,7 @@ public class Tokenizer {
     }
 
     private static void buildExecuteChain(String expression, ClassToken token, String suffixStr) {
-        String[] step = suffixStr.split("\\.");
+        String[] step = splitWithoutBracket(suffixStr, '(', ')', '.');
         for (int i = 0; i < step.length; i++) {
             String propOrMethodName = step[i];
             boolean checkMode = propOrMethodName.trim().endsWith("?");
@@ -381,10 +459,7 @@ public class Tokenizer {
                     ExpressionSyntaxException.thrWithMsg("illegal method name", expression, StringUtils.hasText(joiner.toString()) ? (joiner + ".@" + methodName) : methodName);
                 }
                 String group = matcher.group(2);
-                if (StringUtils.hasText(group)){
-                 //todo ` `
-                }
-                token.addMethod(checkMode, methodName, StringUtils.hasText(group) ? group.split(",") : new String[0]);
+                token.addMethod(checkMode, methodName, StringUtils.hasText(group) ? splitWithoutBracket(group, '{', '}', ',') : new String[0]);
             } else {
                 if (!varPattern.matcher(propOrMethodName).matches()) {
                     StringJoiner joiner = new StringJoiner(".");
@@ -399,17 +474,6 @@ public class Tokenizer {
 
     }
 
-    private static int getSubElBracketCount(String expression) {
-        int count = 0;
-        for (char c : expression.toCharArray()) {
-            if (c == '`') count++;
-        }
-        if (count == 1) {
-            ExpressionSyntaxException.thr(expression, "`");
-        }
-        return count;
-    }
-
     private static int nextNonempty(char[] charArray, int cursor) {
         cursor++;
         boolean hasFind = false;
@@ -422,6 +486,34 @@ public class Tokenizer {
             }
         }
         return hasFind ? cursor : -1;
+    }
+
+    private static String[] splitWithoutBracket(String toBeSplit, char leftBracket, char rightBracket, char split) {
+        char[] chars = toBeSplit.toCharArray();
+        ArrayList<String> result = new ArrayList<>();
+        int leftQuote = 0;
+        int lastSplit = 0;
+        for (int i = 0; i < chars.length; i++) {
+            if (chars[i] == leftBracket) {
+                leftQuote++;
+                continue;
+            }
+
+            if (chars[i] == rightBracket) {
+                leftQuote--;
+                continue;
+            }
+
+            if (leftQuote > 0) continue;
+
+            if (chars[i] == split) {
+                result.add(toBeSplit.substring(lastSplit, i));
+                lastSplit = i + 1;
+            }
+        }
+        result.add(toBeSplit.substring(lastSplit));
+
+        return result.toArray(String[]::new);
     }
 
 }

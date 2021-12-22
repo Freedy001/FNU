@@ -52,7 +52,7 @@ public final class StaticToken extends ClassToken {
             throw new EvaluateException("reference is null,can not doCalculate");
         }
         try {
-            return Class.forName(reference);
+            return Class.forName(reference.replaceAll(" ",""));
         } catch (ClassNotFoundException e) {
             if (checkMode) {
                 return null;

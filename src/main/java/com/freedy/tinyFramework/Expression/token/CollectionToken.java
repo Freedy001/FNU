@@ -69,7 +69,7 @@ public final class CollectionToken extends Token {
                 if (index == null) {
                     throw new EvaluateException("illegal ops [?], ops can not be null", relevantOps.getExpression()).errToken(this.errStr("[" + relevantOps.getExpression() + "]"));
                 }
-                if (index >= originToken.size()) {
+                if (index >= subTokenStream.size()) {
                     throw new EvaluateException("illegal ops(Array[?]),index out of bound", relevantOps.getExpression()).errToken(this.errStr("[" + relevantOps.getExpression() + "]"));
                 }
                 TokenStream stream = subTokenStream.get(index);
