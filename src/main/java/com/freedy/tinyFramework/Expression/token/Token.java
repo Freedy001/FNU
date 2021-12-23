@@ -26,7 +26,7 @@ import java.util.*;
 @AllArgsConstructor
 @JSONType(includes = {"type", "value"})
 public sealed abstract class Token implements Comparable, Executable
-        permits BasicVarToken, BlockToken, ClassToken, CollectionToken, LoopToken, MapToken, NormalVarToken, ObjectToken, OpsToken, TernaryToken, WrapperToken {
+        permits IfToken, BasicVarToken, BlockToken, ClassToken, CollectionToken, LoopToken, MapToken, NormalVarToken, ObjectToken, OpsToken, StopToken, TernaryToken, WrapperToken {
     @ToString.Include
     protected String type;
     @ToString.Include

@@ -3,6 +3,7 @@ package com.freedy.tinyFramework.Expression.token;
 import com.freedy.tinyFramework.Expression.EvaluationContext;
 import com.freedy.tinyFramework.Expression.Expression;
 import com.freedy.tinyFramework.Expression.TokenStream;
+import com.freedy.tinyFramework.exception.StopSignal;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -44,9 +45,24 @@ public final class LoopToken extends Token {
         subExpression.setTokenStream(loopTokenStream);
         Object result = null;
         if (iterable instanceof Number num) {
-            for (long i = 0; i < num.longValue(); i++) {
-                context.setVariable(variableName, i);
-                result=subExpression.getValue();
+            for (int i = 0; i < num.longValue(); i++) {
+                try {
+                    context.setVariable(variableName, i);
+                    result = subExpression.getValue();
+                } catch (Throwable e) {
+                    StopSignal signal = StopSignal.getInnerSignal(e);
+                    if (signal != null) {
+                        String signalMsg = signal.getMessage();
+                        if ("continue".equals(signalMsg)) {
+                            continue;
+                        }
+                        if ("break".equals(signalMsg)) {
+                            break;
+                        }
+                    } else {
+                        throw e;
+                    }
+                }
             }
             return result;
         }
@@ -55,14 +71,36 @@ public final class LoopToken extends Token {
         }
         if (iterable instanceof Iterable collection) {
             for (Object o : collection) {
-                context.setVariable(variableName, o);
-                result=subExpression.getValue();
+                try {
+                    context.setVariable(variableName, o);
+                    result = subExpression.getValue();
+                } catch (Throwable e) {
+                    StopSignal signal = StopSignal.getInnerSignal(e);
+                    if (signal != null) {
+                        String signalMsg = signal.getMessage();
+                        if ("continue".equals(signalMsg)) {
+                            continue;
+                        }
+                        if ("break".equals(signalMsg)) {
+                            break;
+                        }
+                    } else {
+                        throw e;
+                    }
+                }
             }
             return result;
         }
         //非可迭代元素
-        context.setVariable(variableName, iterable);
-        result=subExpression.getValue();
+        try {
+            context.setVariable(variableName, iterable);
+            result = subExpression.getValue();
+        } catch (Throwable e) {
+            StopSignal signal = StopSignal.getInnerSignal(e);
+            if (signal == null) {
+                throw e;
+            }
+        }
 
 
         return result;

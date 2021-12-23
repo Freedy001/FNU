@@ -574,8 +574,8 @@ public class ReflectionUtils {
                 int i = 0;
                 for (; i < length; i++) {
                     Class<?> originMethodArgs = convertToWrapper(clazz[i]);
-                    Class<?> supplyMethodArgs = convertToWrapper(args[i].getClass());
-                    if (!originMethodArgs.isAssignableFrom(supplyMethodArgs)) {
+                    Class<?> supplyMethodArgs = convertToWrapper(args[i] == null ? clazz[i] : args[i].getClass());
+                    if (!originMethodArgs.isAssignableFrom(supplyMethodArgs) && !isConvertable(originMethodArgs, supplyMethodArgs)) {
                         break;
                     }
                 }
@@ -615,6 +615,24 @@ public class ReflectionUtils {
             }
         }
         return targetClass.cast(instance);
+    }
+
+    private static final Map<String, Set<String>> convertableMap = new HashMap<>();
+
+    static {
+        convertableMap.put("java.lang.Long", Set.of("java.lang.Integer", "int"));
+        convertableMap.put("long", Set.of("java.lang.Integer", "int"));
+        convertableMap.put("java.lang.Integer", Set.of("java.lang.Long", "long"));
+        convertableMap.put("int", Set.of("java.lang.Long", "long"));
+    }
+
+    public static boolean isConvertable(Class<?> originMethodArgs, Class<?> supplyMethodArgs) {
+        return Optional.ofNullable(convertableMap.get(originMethodArgs.getName())).orElse(Set.of()).contains(supplyMethodArgs.getName());
+    }
+
+    //todo
+    public static boolean convert(Class<?> originMethodArgs, Class<?> supplyMethodArgs) {
+        return Optional.ofNullable(convertableMap.get(originMethodArgs.getName())).orElse(Set.of()).contains(supplyMethodArgs.getName());
     }
 
 }

@@ -10,6 +10,7 @@ import lombok.SneakyThrows;
 import java.util.Scanner;
 import java.util.StringJoiner;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 
 /**
  * @author Freedy
@@ -27,6 +28,7 @@ public class Main {
         context.setVariable("test", test);
         context.setVariable("class2", class2);
         context.setVariable("class3", class3);
+        context.setVariable("scanner", new Scanner(System.in));
     }
 
     /*
@@ -88,16 +90,31 @@ public class Main {
 //        evaluate("#tes?.haha()");
 //        evaluate("def haha='nihao'",()->test.getAge());
 //        evaluate("#haha",()->test.getAge());
+        Pattern pattern = Pattern.compile("(if|else if) +(.*?) *?: *?\\((.*?)\\)|else *?\\((.*?)\\)");
+
+        String ifStr= """
+                if {a>0} : (gaga)
+                """;
+
         evaluate("""
-                def map={'haha':'gege'};
-                for i in 10:({
-                    #map.put({#i+'haha'},'haha');
-                });
-                for entry in #map.entrySet():({
-                    T(java.lang.System).out.println(#entry);
+                for i in T(java.lang.Long).MAX_VALUE:({
+                    T(java.lang.System).out.print('输入正则表达式: ');
+                    def pattern=T(java.util.regex.Pattern).compile(#scanner.nextLine());
+                    for j in T(java.lang.Long).MAX_VALUE:({
+                        T(java.lang.System).out.print('输入匹配字符串: ');
+                        def matcher = #pattern.matcher(#scanner.nextLine());
+                        for k in #matcher.find():({
+                            for groupCount in #matcher.groupCount():({
+                                T(java.lang.System).out.println(#matcher.group(#groupCount));
+                            });
+                        
+                        });
+                        
+                    });
                 });
                 """);
-        System.out.println();
+//        Scanner.class.getConstructor().newInstance();
+//        System.out.println();
 
 //        evaluate("""
 //                def abc=asdasdasd;

@@ -4,6 +4,7 @@ import com.freedy.tinyFramework.Expression.token.*;
 import com.freedy.tinyFramework.exception.EvaluateException;
 import com.freedy.tinyFramework.exception.ExpressionSyntaxException;
 import com.freedy.tinyFramework.exception.IllegalArgumentException;
+import com.freedy.tinyFramework.exception.StopSignal;
 import com.freedy.tinyFramework.utils.ReflectionUtils;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -67,8 +68,7 @@ public class Expression {
     public Object evaluate(Class<?> desired, EvaluationContext context) {
         int size = stream.blockSize();
         Object[] result = new Object[1];
-        stream.forEachStream(context, (i, suffixList) ->
-                result[0] = doEvaluate(suffixList, i == size - 1 ? desired : ANY_TYPE));
+        stream.forEachStream(context, (i, suffixList) -> result[0] = doEvaluate(suffixList, i == size - 1 ? desired : ANY_TYPE));
         return result[0];
     }
 
@@ -85,11 +85,15 @@ public class Expression {
                     continue;
                 }
                 varStack.push(token);
+            } catch (StopSignal e) {
+                throw e;
             } catch (ExpressionSyntaxException e) {
-                ExpressionSyntaxException.thrThis(expression,e);
+                ExpressionSyntaxException.thrThis(expression, e);
             } catch (EvaluateException e) {
                 ExpressionSyntaxException.thrEvaluateException(e, expression, token);
-            } catch (Exception e) {
+            } catch (Throwable e) {
+                StopSignal signal = StopSignal.getInnerSignal(e);
+                if (signal != null) throw signal;
                 ExpressionSyntaxException.tokenThr(e, expression, token);
             }
         }
@@ -98,11 +102,15 @@ public class Expression {
             Object result = null;
             try {
                 result = token.calculateResult(desired);
+            } catch (StopSignal e) {
+                throw e;
             } catch (ExpressionSyntaxException e) {
                 ExpressionSyntaxException.thrThis(expression, e);
             } catch (EvaluateException e) {
                 ExpressionSyntaxException.thrEvaluateException(e, expression, token);
-            } catch (Exception e) {
+            } catch (Throwable e) {
+                StopSignal signal = StopSignal.getInnerSignal(e);
+                if (signal != null) throw signal;
                 ExpressionSyntaxException.tokenThr(e, expression, token);
             }
             return result;

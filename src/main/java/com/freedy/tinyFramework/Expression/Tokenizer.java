@@ -36,13 +36,15 @@ public class Tokenizer {
 
     private static final Pattern methodPattern = Pattern.compile("(.*?)\\((.*)\\)");
     //      static                                         T  (java.lang.Math) . ?  pow      (  3 ,    2 )
-    private static final Pattern expressionBracket = Pattern.compile(".*?T *?\\($|.*?\\. *?\\w+ *?\\($|^for +(.*?) +in +(.*?) *?: *?\\($");
+    private static final Pattern expressionBracket = Pattern.compile(".*?T *?\\($|.*?\\. *?\\w+ *?\\($|.*?: *?\\($");
     //      static                                       以[a-zA-Z0-9_]开头
     private static final Pattern varPattern = Pattern.compile("^[a-zA-Z_]\\w*");
 
     private static final Pattern defPattern = Pattern.compile("^def +?(.*)");
     //                         for i in 100:(// do some thing)
     private static final Pattern loopPattern = Pattern.compile("^for +(.*?) +in +(.*?) *?: *?\\((.*)\\)");
+    // if
+    private static final Pattern ifPattern = Pattern.compile("(if|else +if) +(.*?) *?: *?\\((?:(.*?)\\)(?= +else)|(.*)\\))|else *?: *?\\((.*)\\)");
 
     //[<=>| static !+_*?()]
     private static final Set<Character> operationSet = Set.of('=', '<', '>', '|', '&', '!', '+', '-', '*', '/', '(', ')', '?');
@@ -70,7 +72,7 @@ public class Tokenizer {
     private static TokenStream doGetTokenStream(String expression, TokenStream tokenStream) {
         String[] bracket = splitWithoutBracket(expression, '{', '}', ';');
         for (String sub : bracket) {
-            if (StringUtils.isEmpty(sub)) continue;
+            if (StringUtils.isEmpty(sub = sub.trim())) continue;
             if (sub.startsWith("{") && sub.endsWith("}")) {
                 sub = sub.substring(1, sub.length() - 1);
                 doGetTokenStream(sub, tokenStream);
@@ -335,6 +337,43 @@ public class Tokenizer {
             tokenStream.addToken(loopToken);
             return;
         }
+        //构建if语句  (if|else +if) +(.*?) *?: *?\((.*?)\)|else *?\((.*?)\)
+        matcher = ifPattern.matcher(token);
+        if (matcher.find()) {
+            IfToken ifToken = new IfToken(token);
+            tokenStream.addToken(ifToken);
+            boolean first = true;
+            do {
+                String ifOrIfElse = matcher.group(1);
+                if (StringUtils.hasText(ifOrIfElse)) {
+                    if (first && ifOrIfElse.equals("else if")) {
+                        ExpressionSyntaxException.thr(token, "else if");
+                    }
+                    String boolBlock = matcher.group(2);
+                    if (StringUtils.isEmpty(boolBlock)) {
+                        ExpressionSyntaxException.thrWithMsg("condition area can not be empty", token, "if");
+                    }
+                    String mainBody = matcher.group(3);
+                    if (StringUtils.isEmpty(mainBody)) {
+                        mainBody = matcher.group(4);
+                        if (StringUtils.isEmpty(mainBody)) {
+                            ExpressionSyntaxException.thrWithMsg("mainBody area can not be empty", token, ":()");
+                        }
+                    }
+
+                    TokenStream bStream = doGetTokenStream(boolBlock);
+                    TokenStream mStream = doGetTokenStream(mainBody);
+                    ifToken.addStatement(bStream, mStream);
+                }
+                String elseStatement = matcher.group(5);
+                if (StringUtils.hasText(elseStatement)) {
+                    TokenStream eStream = doGetTokenStream(elseStatement);
+                    ifToken.setElseTokenStream(eStream);
+                }
+                first = false;
+            } while (matcher.find());
+            return;
+        }
         //构建static Token
         matcher = staticPattern.matcher(token);
         if (matcher.find()) {
@@ -398,6 +437,11 @@ public class Tokenizer {
             }
             objectToken.setVariableName(varName);
             tokenStream.addToken(objectToken);
+            return;
+        }
+        //构建break
+        if (token.matches("break|continue")) {
+            tokenStream.addToken(new StopToken(token));
             return;
         }
         //构建 numeric Token

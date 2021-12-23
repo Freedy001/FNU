@@ -39,26 +39,31 @@ public class TokenStream implements Executable {
         this.expression = expression;
     }
 
-    private final List<List<Token>> blockStream = new LinkedList<>();
-
+    private final List<List<Token>> blockStream = new ArrayList<>();
+    private final List<List<Token>> suffixCache = new ArrayList<>();
 
     public void splitStream() {
         blockStream.add(infixExpression);
+        suffixCache.clear();
         infixExpression = new ArrayList<>();
     }
 
-    public List<Token> next(EvaluationContext context) {
-        if (blockStream.size() == 0) return null;
-        infixExpression = blockStream.remove(0);
-        setEachTokenContext(context);
-        return calculateSuffix();
-    }
 
     public void forEachStream(EvaluationContext context, BiConsumer<Integer, List<Token>> indexSuffixList) {
-        for (int i = 0; i < blockStream.size(); i++) {
+        int size = blockStream.size();
+        if (size == suffixCache.size()) {
+            for (int i = 0; i < size; i++) {
+                indexSuffixList.accept(i, suffixCache.get(i));
+            }
+            return;
+        }
+        suffixCache.clear();
+        for (int i = 0; i < size; i++) {
             infixExpression = blockStream.get(i);
             setEachTokenContext(context);
-            indexSuffixList.accept(i,calculateSuffix());
+            List<Token> suffix = calculateSuffix();
+            suffixCache.add(suffix);
+            indexSuffixList.accept(i, suffix);
         }
     }
 
@@ -160,10 +165,10 @@ public class TokenStream implements Executable {
     // ba2=
     // <=+
     public List<Token> calculateSuffix() {
-        //计算偏移量
-        calculateOffset(0, infixExpression);
         //合并单值操作
         mergeSingleTokenOps();
+        //计算偏移量
+        calculateOffset(0, infixExpression);
         List<Token> suffixExpression = new ArrayList<>();
         Stack<Token> opsStack = new Stack<>();
         //扫描中缀
@@ -231,21 +236,21 @@ public class TokenStream implements Executable {
                                 ExpressionSyntaxException.tokenThr(expression, token);
                             }
                             assert nextToken != null;
+                            nextToken.setOriginToken(token, nextToken);
                             if (ops.equals("++")) {
                                 nextToken.setPreSelfAddFlag(true);
                             } else
                                 nextToken.setPreSelfSubFlag(true);
                             infixExpression.remove(i);
-                            nextToken.setOriginToken(token, nextToken);
                             continue;
                         }
                         if (nextToken == null || nextToken.isType("operation")) {
+                            preToken.setOriginToken(preToken, token);
                             if (ops.equals("++"))
                                 preToken.setPostSelfAddFlag(true);
                             else
                                 preToken.setPostSelfSubFlag(true);
                             infixExpression.remove(i);
-                            preToken.setOriginToken(preToken, token);
                         }
                     }
                 }
