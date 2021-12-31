@@ -141,7 +141,7 @@ public class BeanDefinitionScanner implements Scanner {
     }
 
 
-    private List<Class<?>> doScan(@NonNull String[] PackageNames, String[] exclude) {
+    public static List<Class<?>> doScan(@NonNull String[] PackageNames, String[] exclude) {
 
         ClassLoader classLoader = BeanDefinitionScanner.class.getClassLoader();
         List<Class<?>> list = new ArrayList<>();

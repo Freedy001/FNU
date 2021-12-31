@@ -1,5 +1,6 @@
 package com.freedy.tinyFramework.Expression.token;
 
+import com.freedy.tinyFramework.exception.EvaluateException;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -27,6 +28,9 @@ public final class ObjectToken extends Token implements Assignable {
     @Override
     protected Object doCalculate(Class<?> desiredType) {
         Object check = checkAndSelfOps(coreObject);
+        if (context.containsVariable(variableName)){
+            throw new EvaluateException("You have defined variable ?",variableName);
+        }
         context.setVariable(variableName, check);
         return check;
     }

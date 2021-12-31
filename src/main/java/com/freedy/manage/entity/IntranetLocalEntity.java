@@ -25,4 +25,5 @@ public class IntranetLocalEntity {
     private Integer intranetMaxBadConnectTimes;
     private Integer intranetServerZeroChannelIdleTime;
     private Struct.ConfigGroup[] intranetGroups;
+    private String test;
 }

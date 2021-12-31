@@ -43,32 +43,45 @@ public class Expression {
         this.context = context;
     }
 
-    public void setTokenStream(TokenStream stream) {
+    public Expression setTokenStream(TokenStream stream) {
         this.stream = stream;
         this.expression = stream.getExpression();
+        return this;
     }
 
     public Object getValue() {
-        return evaluate(ANY_TYPE, context);
+        return evaluate(stream, ANY_TYPE, context);
     }
 
     public <T> T getValue(Class<T> desiredResultType) {
-        return desiredResultType.cast(evaluate(desiredResultType, context));
+        return desiredResultType.cast(evaluate(stream, desiredResultType, context));
     }
 
     public Object getValue(EvaluationContext context) {
-        return evaluate(ANY_TYPE, context);
+        return evaluate(stream, ANY_TYPE, context);
     }
 
     public <T> T getValue(EvaluationContext context, Class<T> desiredResultType) {
-        return desiredResultType.cast(evaluate(desiredResultType, context));
+        return desiredResultType.cast(evaluate(stream, desiredResultType, context));
     }
 
 
-    public Object evaluate(Class<?> desired, EvaluationContext context) {
+    public Object evaluate(TokenStream stream, Class<?> desired, EvaluationContext context) {
         int size = stream.blockSize();
         Object[] result = new Object[1];
-        stream.forEachStream(context, (i, suffixList) -> result[0] = doEvaluate(suffixList, i == size - 1 ? desired : ANY_TYPE));
+        try {
+            stream.forEachStream(context, (i, suffixList) -> result[0] = doEvaluate(suffixList, i == size - 1 ? desired : ANY_TYPE));
+        } catch (Throwable e) {
+            StopSignal signal = StopSignal.getInnerSignal(e);
+            if (signal != null) {
+                String message = signal.getSignal();
+                if (message.contains("return")) {
+                    TokenStream subStream = signal.getReturnStream();
+                    return subStream == null ? null : evaluate(subStream, ANY_TYPE, context);
+                }
+            }
+            throw e;
+        }
         return result[0];
     }
 
@@ -85,15 +98,12 @@ public class Expression {
                     continue;
                 }
                 varStack.push(token);
-            } catch (StopSignal e) {
-                throw e;
-            } catch (ExpressionSyntaxException e) {
+            }catch (ExpressionSyntaxException e) {
+                e.clearErrorStr().buildToken(token);
                 ExpressionSyntaxException.thrThis(expression, e);
             } catch (EvaluateException e) {
                 ExpressionSyntaxException.thrEvaluateException(e, expression, token);
             } catch (Throwable e) {
-                StopSignal signal = StopSignal.getInnerSignal(e);
-                if (signal != null) throw signal;
                 ExpressionSyntaxException.tokenThr(e, expression, token);
             }
         }
@@ -102,15 +112,12 @@ public class Expression {
             Object result = null;
             try {
                 result = token.calculateResult(desired);
-            } catch (StopSignal e) {
-                throw e;
-            } catch (ExpressionSyntaxException e) {
+            }catch (ExpressionSyntaxException e) {
+                e.clearErrorStr().buildToken(token);
                 ExpressionSyntaxException.thrThis(expression, e);
             } catch (EvaluateException e) {
                 ExpressionSyntaxException.thrEvaluateException(e, expression, token);
             } catch (Throwable e) {
-                StopSignal signal = StopSignal.getInnerSignal(e);
-                if (signal != null) throw signal;
                 ExpressionSyntaxException.tokenThr(e, expression, token);
             }
             return result;

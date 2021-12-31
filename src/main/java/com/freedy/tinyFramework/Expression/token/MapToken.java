@@ -4,7 +4,7 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.annotation.JSONType;
 import com.freedy.tinyFramework.Expression.Expression;
-import com.freedy.tinyFramework.Expression.Tokenizer;
+import com.freedy.tinyFramework.Expression.tokenBuilder.Tokenizer;
 import com.freedy.tinyFramework.exception.EvaluateException;
 import com.freedy.tinyFramework.exception.IllegalArgumentException;
 import com.freedy.tinyFramework.utils.ReflectionUtils;

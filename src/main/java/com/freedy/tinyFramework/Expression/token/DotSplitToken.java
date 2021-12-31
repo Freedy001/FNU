@@ -5,6 +5,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.util.Optional;
+
 /**
  * @author Freedy
  * @date 2021/12/20 17:33
@@ -24,7 +26,7 @@ public final class DotSplitToken extends ClassToken {
     protected Object doCalculate(Class<?> desiredType) {
         Object baseObject = baseToken.calculateResult(ANY_TYPE);
         if (baseObject == null) {
-            if (checkMode){
+            if (Optional.ofNullable(getRelevantOps()).orElse("").equals("?")){
                 return null;
             }
             throw new EvaluateException("? calculate a null value",baseToken);

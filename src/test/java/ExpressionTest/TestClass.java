@@ -2,6 +2,7 @@ package ExpressionTest;
 
 import lombok.Data;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,7 +24,15 @@ public class TestClass {
     private boolean _if=true;
     public TestClass2 t2=new TestClass2();
     public Map<String, String> map=new HashMap<>();
-    public List<String> list=List.of("haha","pin","without","out","kidding");
+    public List<Object> strList=new ArrayList<>();
+    {
+        strList.add("cp");
+        strList.add(null);
+        strList.add(List.of("gaga"));
+    }
+    public List<Object> list=List.of("haha","pin",
+            strList
+            ,"out","kidding");
 
     public static Boolean test(Boolean flag){
         return flag;

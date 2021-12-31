@@ -47,7 +47,8 @@ public class ExpressionSyntaxException extends RuntimeException {
 
     public static void thrEvaluateException(EvaluateException e, String expression, Token token) {
         List<Token> tokens = e.getTokenList();
-        new ExpressionSyntaxException(expression)
+        String sub = e.getExpression();
+        new ExpressionSyntaxException(StringUtils.hasText(sub) ? sub : expression)
                 .buildCause(e)
                 .buildToken(tokens.isEmpty() ? new Token[]{token} : tokens.toArray(Token[]::new))
                 .buildConsoleErrorMsg()
@@ -100,6 +101,7 @@ public class ExpressionSyntaxException extends RuntimeException {
         if (tokens == null || tokens.length == 0) {
             return this;
         }
+        layer.clear();
 
         LinkedList<Token> queue = new LinkedList<>(Arrays.asList(tokens));
         queue.sort(Comparator.comparingInt(Token::getOffset));
@@ -128,6 +130,11 @@ public class ExpressionSyntaxException extends RuntimeException {
                 syntaxErrStr.add(s);
             }
         }
+        return this;
+    }
+
+    public ExpressionSyntaxException clearErrorStr() {
+        syntaxErrStr.clear();
         return this;
     }
 
@@ -174,7 +181,7 @@ public class ExpressionSyntaxException extends RuntimeException {
                             
                 \033[93m:)?\033[93m at:\033[0;39m
                     ?
-                    \033[91m?\033[0;39m""", msg == null ? (cause == null ? "syntax error" : cause.getMessage()) : msg, highlightExpression, underLine
+                    \033[91m?\033[0;39m""", msg == null ? cause == null ? "syntax error" : cause.getMessage() : msg, highlightExpression, underLine
         );
         return this;
     }
@@ -317,8 +324,15 @@ public class ExpressionSyntaxException extends RuntimeException {
             if (chars[i] == ' ') continue;
             int start = i;
             for (int j = 0; j < subLen; j++, i++) {
-                for (; chars[i] == ' '; i++) ;
-                for (; subChars[j] == ' '; j++) ;
+                for (; i < len && chars[i] == ' '; i++) ;
+                for (; j < subLen && subChars[j] == ' '; j++) ;
+                if (j == subLen) {
+                    return new int[]{start, behindIndex != -1 ? behindIndex : i};
+                }
+                if (i == len) {
+                    return null;
+                }
+
                 if (subChars[j] == '@') {
                     start = i;
                     j++;

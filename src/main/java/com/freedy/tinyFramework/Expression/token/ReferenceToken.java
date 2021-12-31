@@ -9,6 +9,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.lang.reflect.Type;
+import java.util.Objects;
 
 /**
  * @author Freedy
@@ -26,7 +27,7 @@ public final class ReferenceToken extends ClassToken {
 
     @Override
     protected Object doCalculate(Class<?> desiredType) {
-        Object variable = getVariable();
+        Object variable = doRelevantOps(getVariable(), reference);
         if (variable == null) return null;
         return checkAndSelfOps(executeChain(variable.getClass(), variable, executableCount));
     }
@@ -34,20 +35,42 @@ public final class ReferenceToken extends ClassToken {
 
     @Override
     public void assignFrom(Token assignment) {
-        String propertyName = getLastPropertyName();
-        if (propertyName == null) {
-            Object result = assignment.calculateResult(Token.ANY_TYPE);
-            context.setVariable(reference, result);
-            return;
-        }
+        ExecuteStep step = getLastPropertyStep();
         Object variable = getVariable();
         if (variable == null) {
             throw new EvaluateException("there is no ? in the context", reference).errToken(this.errStr(reference));
         }
+        if (step == null) {
+            relevantAssign(
+                    relevantOps,
+                    () -> variable,
+                    () -> assignment.calculateResult(ANY_TYPE),
+                    () -> doAssign(assignment.calculateResult(ANY_TYPE))
+            );
+            return;
+        }
+        relevantAssign(
+                step.getRelevantOps(),
+                () -> executeChain(variable.getClass(), variable, executableCount,false),
+                () -> assignment.calculateResult(ANY_TYPE),
+                () -> doChainAssign(assignment, step, variable)
+        );
+    }
+
+
+    private void doChainAssign(Token assignment, ExecuteStep step, Object variable) {
         variable = executeChain(variable.getClass(), variable, executableCount - 1);
-        Type desiredType = ReflectionUtils.getFieldRecursion(variable.getClass(), propertyName).getGenericType();
+        Type desiredType = Objects.requireNonNull(ReflectionUtils.getFieldRecursion(variable.getClass(), step.getPropertyName())).getGenericType();
         Object result = assignment.calculateResult(desiredType);
-        ReflectionUtils.setter(variable, propertyName, result);
+        ReflectionUtils.setter(variable, step.getPropertyName(), result);
+    }
+
+
+    private void doAssign(Object result) {
+        if (!context.containsVariable(reference)) {
+            throw new EvaluateException("you must def ? first", reference);
+        }
+        context.setVariable(reference, result);
     }
 
     private Object getVariable() {
@@ -55,10 +78,6 @@ public final class ReferenceToken extends ClassToken {
             throw new EvaluateException("reference is null");
         }
         checkContext();
-        Object variable = context.getVariable(reference);
-        if (!checkMode && variable == null) {
-            throw new EvaluateException("there is no ? in the context", reference).errToken(this.errStr(reference));
-        }
-        return variable;
+        return context.getVariable(reference);
     }
 }

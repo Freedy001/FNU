@@ -9,6 +9,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.lang.reflect.Type;
+import java.util.Optional;
 
 /**
  * @author Freedy
@@ -32,19 +33,28 @@ public final class StaticToken extends ClassToken {
 
     @Override
     public void assignFrom(Token assignment) {
-        String propertyName = getLastPropertyName();
-        if (propertyName == null) {
+        ExecuteStep step = getLastPropertyStep();
+        if (step == null) {
             throw new EvaluateException("T(?) can not be assigned", reference).errToken(this.errStr(reference));
         }
         Class<?> type = getOpsType();
         if (type == null) {
             throw new EvaluateException("can not find class ?", reference).errToken(this.errStr(reference));
         }
+        relevantAssign(
+                step.getRelevantOps(),
+                () -> executeChain(type, null, executableCount,false),
+                () -> assignment.calculateResult(ANY_TYPE),
+                () -> doChainAssign(assignment, step, type)
+        );
+    }
+
+    private void doChainAssign(Token assignment, ExecuteStep step, Class<?> type) {
         Object variable = executeChain(type, null, executableCount - 1);
         type = variable == null ? type : variable.getClass();
-        Type desiredType = ReflectionUtils.getFieldRecursion(type, propertyName).getGenericType();
+        Type desiredType = ReflectionUtils.getFieldRecursion(type, step.getPropertyName()).getGenericType();
         Object result = assignment.calculateResult(desiredType);
-        ReflectionUtils.setter(type, variable, propertyName, result);
+        ReflectionUtils.setter(type, variable, step.getPropertyName(), result);
     }
 
     private Class<?> getOpsType() {
@@ -54,7 +64,7 @@ public final class StaticToken extends ClassToken {
         try {
             return Class.forName(reference.replaceAll(" ",""));
         } catch (ClassNotFoundException e) {
-            if (checkMode) {
+            if (Optional.ofNullable(getRelevantOps()).orElse("").trim().equals("?")) {
                 return null;
             }
             throw new EvaluateException("can not find class ?", e).errToken(this.errStr(reference));

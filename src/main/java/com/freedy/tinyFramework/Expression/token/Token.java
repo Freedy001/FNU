@@ -16,6 +16,15 @@ import java.math.RoundingMode;
 import java.util.*;
 
 /**
+ * 所有Token的基类,提供一些默认token操作/计算方法。 <br/>
+ * 所有继承Token的类需要重写 doCalculate() 或者 doGenericCalculate()方法。 <br/>
+ * doCalculate():需要返回该token表示的值。<br/>
+ * 例如:<br/>
+ * new BasicVarToken('abc');    doCalculate()返回的值就是 "abc"(String)<br/>
+ * new BasicVarToken(false);    doCalculate()返回的值就是 false(Boolean)<br/>
+ * new ReferenceToken(#Test);   doCalculate()返回的值就是 obj(Object) (命名为Test的对象) <br/>
+ * doGenericCalculate(); 该方法与上面方法类似只不过其参数是ParameterizedType 可以根据泛型更加精准的计算结果.
+ *
  * @author Freedy
  * @date 2021/12/14 15:33
  */
@@ -26,7 +35,7 @@ import java.util.*;
 @AllArgsConstructor
 @JSONType(includes = {"type", "value"})
 public sealed abstract class Token implements Comparable, Executable
-        permits IfToken, BasicVarToken, BlockToken, ClassToken, CollectionToken, LoopToken, MapToken, NormalVarToken, ObjectToken, OpsToken, StopToken, TernaryToken, WrapperToken {
+        permits BasicVarToken, BlockToken, ClassToken, CollectionToken, ErrMsgToken, IfToken, LoopToken, MapToken, ObjectToken, OpsToken, StopToken, TernaryToken, WrapperToken {
     @ToString.Include
     protected String type;
     @ToString.Include
@@ -53,7 +62,7 @@ public sealed abstract class Token implements Comparable, Executable
     protected Class<?> desiredType;
 
     public final static Class<Object> ANY_TYPE = Object.class;
-    //用于setOriginToken()的参数 表示本对象
+
 
     public Token(String type, String value) {
         this.type = type;
@@ -102,6 +111,7 @@ public sealed abstract class Token implements Comparable, Executable
     }
 
     public Token errStr(String... str) {
+        if (str == null) return this;
         if (errStr == null) {
             errStr = new ArrayList<>();
         }
@@ -210,7 +220,7 @@ public sealed abstract class Token implements Comparable, Executable
             }
         }
         BigDecimal a = new BigDecimal(o1 + "");
-        BigDecimal b = new BigDecimal(o1 + "");
+        BigDecimal b = new BigDecimal(o2 + "");
         switch (type.getValue()) {
             case "+" -> {
                 return a.add(b).toString();
@@ -353,6 +363,10 @@ public sealed abstract class Token implements Comparable, Executable
     protected Object check(Object result) {
         if (result == null) return null;
         if (!ReflectionUtils.convertToWrapper(desiredType).isInstance(result)) {
+            Object res = ReflectionUtils.tryConvert(desiredType, result);
+            if (res!=Boolean.FALSE){
+                return res;
+            }
             throw new EvaluateException("unmatched type! real type ? desired type ?", result.getClass().getName(), desiredType.getName());
         }
         return result;
@@ -381,7 +395,7 @@ public sealed abstract class Token implements Comparable, Executable
     }
 
     protected Object checkAndSelfOps(Object result) {
-        return selfOps(check(result));
+        return check(selfOps(result));
     }
 
     private Object numSelfOps(Object result, int num, boolean isPost) {
@@ -390,11 +404,11 @@ public sealed abstract class Token implements Comparable, Executable
             if (this instanceof Assignable assignable) {
                 assignable.assignFrom(new BasicVarToken("numeric", add + ""));
             } else {
-                throw new EvaluateException("PRE SELF ADD OPS are not supported on ? token", this.getType());
+                throw new EvaluateException("SELF OPS are not supported on ? token", this.getType());
             }
             return isPost ? result : add;
         }
-        throw new EvaluateException("PRE SELF ADD OPS [?++] on none Numeric type ?", result, result.getClass().getName());
+        throw new EvaluateException("SELF OPS [?++] on none Numeric type ?", result, result.getClass().getName());
     }
 
 

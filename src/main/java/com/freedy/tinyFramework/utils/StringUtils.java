@@ -1,5 +1,7 @@
 package com.freedy.tinyFramework.utils;
 
+import com.freedy.tinyFramework.exception.IllegalArgumentException;
+
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -17,8 +19,11 @@ public class StringUtils {
         return s != null && !s.equals("");
     }
 
-    public static boolean isEmpty(String s) {
-        return s == null || s.equals("");
+    public static boolean allHasText(String... s) {
+        for (String s1 : s) {
+            if (isEmpty(s1)) return false;
+        }
+        return true;
     }
 
     public static boolean hasAnyText(String... s) {
@@ -28,11 +33,23 @@ public class StringUtils {
         return false;
     }
 
+    public static boolean isEmpty(String s) {
+        return s == null || s.equals("");
+    }
+
+
     public static boolean isAnyEmpty(String... s) {
         for (String s1 : s) {
             if (isEmpty(s1)) return true;
         }
         return false;
+    }
+
+    public static boolean isAllEmpty(String... s){
+        for (String s1 : s) {
+            if (hasText(s1)) return false;
+        }
+        return true;
     }
 
     private static String getUrl(String rawUrl) {
@@ -119,4 +136,59 @@ public class StringUtils {
         return c >= 97 && c <= 122;
     }
 
+
+    public static String[] splitWithoutBracket(String toBeSplit, char leftBracket, char rightBracket, char split) {
+        return splitWithoutBracket(toBeSplit, leftBracket, rightBracket, split, 0);
+    }
+
+    public static String[] splitWithoutBracket(String toBeSplit, char[] leftBracket, char[] rightBracket, char split) {
+        return splitWithoutBracket(toBeSplit,leftBracket,rightBracket,split,0);
+    }
+
+    public static String[] splitWithoutBracket(String toBeSplit, char leftBracket, char rightBracket, char split, int limit) {
+        return splitWithoutBracket(toBeSplit, new char[]{leftBracket}, new char[]{rightBracket}, split, limit);
+    }
+
+    public static String[] splitWithoutBracket(String toBeSplit, char[] leftBracket, char[] rightBracket, char split, int limit) {
+        if (limit < 0) {
+            throw new IllegalArgumentException("arg limit must ge 0");
+        }
+        if (limit == 1) return new String[]{toBeSplit};
+        char[] chars = toBeSplit.toCharArray();
+        ArrayList<String> result = new ArrayList<>();
+        int[] leftQuote = new int[leftBracket.length];
+        int lastSplit = 0;
+        outer:
+        for (int i = 0; i < chars.length; i++) {
+
+            for (int j = 0; j < leftBracket.length; j++) {
+                if (chars[i] == leftBracket[j]) {
+                    leftQuote[j]++;
+                    continue outer;
+                }
+            }
+
+            for (int j = 0; j < rightBracket.length; j++) {
+                if (chars[i] == rightBracket[j]) {
+                    leftQuote[j]--;
+                    continue outer;
+                }
+            }
+
+            for (int j : leftQuote) {
+                if (j>0) continue outer;
+            }
+
+            if (chars[i] == split) {
+                result.add(toBeSplit.substring(lastSplit, i));
+                lastSplit = i + 1;
+                if (result.size() == limit - 1) {
+                    break;
+                }
+            }
+        }
+        result.add(toBeSplit.substring(lastSplit));
+
+        return result.toArray(String[]::new);
+    }
 }

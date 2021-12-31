@@ -1,6 +1,7 @@
 package com.freedy.tinyFramework.utils;
 
 
+import com.freedy.tinyFramework.Expression.stander.LambdaAdapter;
 import com.freedy.tinyFramework.exception.BeanInitException;
 import com.freedy.tinyFramework.exception.IllegalArgumentException;
 import lombok.SneakyThrows;
@@ -67,7 +68,7 @@ public class ReflectionUtils {
         } catch (IllegalArgumentException e) {
             throw e;
         } catch (Exception ex) {
-            throw new IllegalArgumentException("get value failed!", ex);
+            throw new IllegalArgumentException("get value failed! ?", object == null ? "Is this field static?" : "", ex);
         }
     }
 
@@ -556,48 +557,78 @@ public class ReflectionUtils {
     }
 
 
-    public static Object invokeMethod(Object target, String methodName, Object... args) throws Exception {
+    public static Object invokeMethod(Object target, String methodName, Object... args) throws Throwable {
         return invokeMethod(target.getClass(), target, methodName, args);
     }
 
-    public static Object invokeMethod(Class<?> targetClass, Object target, String methodName, Object... args) throws Exception {
+    public static Object invokeMethod(Class<?> targetClass, Object target, String methodName, Object... args) throws Throwable {
         List<Method> list = new ArrayList<>();
+        List<Method> seminary = new ArrayList<>();
+        int methodLen = methodName.length();
         for (Method method : targetClass.getDeclaredMethods()) {
-            if (method.getName().equals(methodName)) {
+            String name = method.getName();
+            if (name.equals(methodName)) {
                 list.add(method);
+            }
+            if (name.contains(methodName) || methodName.contains(name)) {
+                seminary.add(method);
             }
         }
         int length = args.length;
+        Map<Integer,Class<?>> lambdaIndex = new HashMap<>();
         for (Method method : list) {
+            lambdaIndex.clear();
             if (method.getParameterCount() == length) {
                 Class<?>[] clazz = method.getParameterTypes();
                 int i = 0;
                 for (; i < length; i++) {
                     Class<?> originMethodArgs = convertToWrapper(clazz[i]);
                     Class<?> supplyMethodArgs = convertToWrapper(args[i] == null ? clazz[i] : args[i].getClass());
-                    if (!originMethodArgs.isAssignableFrom(supplyMethodArgs) && !isConvertable(originMethodArgs, supplyMethodArgs)) {
-                        break;
+                    if (!originMethodArgs.isAssignableFrom(supplyMethodArgs)) {
+                        Object o = tryConvert(originMethodArgs, args[i]);
+                        if (o != Boolean.FALSE) {
+                            args[i] = o;
+                        } else if (supplyMethodArgs == LambdaAdapter.class) {
+                            //根据参数类型构建lambda
+                            lambdaIndex.put(i,originMethodArgs);
+                        } else {
+                            break;
+                        }
                     }
                 }
                 if (i == length) {
                     method.setAccessible(true);
-                    return method.invoke(target, args);
+                    //参数lambda参数替换
+                    if (lambdaIndex.size() > 0) {
+                        lambdaIndex.forEach((index,originMethodArgs)->{
+                            if (args[index] instanceof LambdaAdapter adapter) {
+                                args[index] = adapter.getInstance(originMethodArgs);
+                            }
+                        });
+                    }
+                    try {
+                        return method.invoke(target, args);
+                    } catch (InvocationTargetException e) {
+                        throw e.getCause() != null ? e.getCause() : e;
+                    }
                 }
             }
         }
         if (methodName.equals("getClass") && args.length == 0) return targetClass;
         StringJoiner argStr = new StringJoiner(",", "(", ")");
         for (Object arg : args) {
-            argStr.add(arg.getClass().getName());
+            argStr.add(arg == null ? "null" : arg.getClass().getName());
         }
-        throw new NoSuchMethodException("no such method " + methodName + argStr + "!you can call these method:" + new PlaceholderParser("?*", list.stream().map(method -> {
+        seminary.sort(Comparator.comparing(o -> Math.abs(o.getName().length() - methodLen)));
+        throw new NoSuchMethodException("no such method \033[34m" + methodName + argStr + " in " + targetClass.getName() + "!\033[0;39myou can call these method:" + new PlaceholderParser("?*", seminary.stream().map(method -> {
             StringJoiner argString = new StringJoiner(",", "(", ")");
             for (Parameter arg : method.getParameters()) {
                 argString.add(arg.getType().getSimpleName() + " " + arg.getName());
             }
             return method.getName() + argString;
-        }).toList()).serialParamsSplit(" , ").ifEmptyFillWith("not find matched method"));
+        }).toList()).serialParamsSplit(" , ").ifEmptyFillWith("not find matched method").configPlaceholderHighLight(PlaceholderParser.PlaceholderHighLight.HIGH_LIGHT_BLUE));
     }
+
 
     @SneakyThrows
     public static <T> T copyProperties(T target, String... excludes) {
@@ -620,19 +651,26 @@ public class ReflectionUtils {
     private static final Map<String, Set<String>> convertableMap = new HashMap<>();
 
     static {
-        convertableMap.put("java.lang.Long", Set.of("java.lang.Integer", "int"));
-        convertableMap.put("long", Set.of("java.lang.Integer", "int"));
-        convertableMap.put("java.lang.Integer", Set.of("java.lang.Long", "long"));
-        convertableMap.put("int", Set.of("java.lang.Long", "long"));
+        convertableMap.put("java.lang.Long", Set.of("java.lang.Integer", "java.lang.Short", "int", "long", "short"));
+        convertableMap.put("java.lang.Integer", Set.of("java.lang.Long", "java.lang.Short", "int", "long", "short"));
+        convertableMap.put("java.lang.Short", Set.of("java.lang.Integer", "java.lang.Long", "int", "long", "short"));
+        convertableMap.put("java.lang.Double", Set.of("java.lang.Float", "double", "float"));
+        convertableMap.put("java.lang.Float", Set.of("java.lang.Double", "double", "float"));
     }
 
     public static boolean isConvertable(Class<?> originMethodArgs, Class<?> supplyMethodArgs) {
         return Optional.ofNullable(convertableMap.get(originMethodArgs.getName())).orElse(Set.of()).contains(supplyMethodArgs.getName());
     }
 
-    //todo
-    public static boolean convert(Class<?> originMethodArgs, Class<?> supplyMethodArgs) {
-        return Optional.ofNullable(convertableMap.get(originMethodArgs.getName())).orElse(Set.of()).contains(supplyMethodArgs.getName());
+    public static Object tryConvert(Class<?> originMethodArgs, Object obj) {
+        if (obj == null) return null;
+        if (!isConvertable(originMethodArgs, obj.getClass())) return false;
+        try {
+            Method valueOf = originMethodArgs.getMethod("valueOf", String.class);
+            return valueOf.invoke(null, obj + "");
+        } catch (Throwable ignored) {
+        }
+        return false;
     }
 
 }

@@ -7,10 +7,10 @@ import com.freedy.tinyFramework.Expression.StanderEvaluationContext;
 import com.freedy.tinyFramework.utils.PlaceholderParser;
 import lombok.SneakyThrows;
 
+import java.util.ArrayList;
 import java.util.Scanner;
 import java.util.StringJoiner;
 import java.util.function.Supplier;
-import java.util.regex.Pattern;
 
 /**
  * @author Freedy
@@ -53,6 +53,7 @@ public class Main {
     */
     @SneakyThrows
     public static void main(String[] args) throws InterruptedException {
+        long startTime = System.currentTimeMillis();
 //        evaluate("T(ExpressionTest.TestClass).testClass2.getName()");
 //        evaluate("T(ExpressionTest.TestClass).NAME='haha'",()->TestClass.NAME);
 //        evaluate("T(ExpressionTest.TestClass).AGE++",()->TestClass.AGE);
@@ -90,62 +91,185 @@ public class Main {
 //        evaluate("#tes?.haha()");
 //        evaluate("def haha='nihao'",()->test.getAge());
 //        evaluate("#haha",()->test.getAge());
-        Pattern pattern = Pattern.compile("(if|else if) +(.*?) *?: *?\\((.*?)\\)|else *?\\((.*?)\\)");
+/*        evaluate("""
 
-        String ifStr= """
-                if {a>0} : (gaga)
-                """;
 
-        evaluate("""
-                for i in T(java.lang.Long).MAX_VALUE:({
-                    T(java.lang.System).out.print('输入正则表达式: ');
-                    def pattern=T(java.util.regex.Pattern).compile(#scanner.nextLine());
-                    for j in T(java.lang.Long).MAX_VALUE:({
-                        T(java.lang.System).out.print('输入匹配字符串: ');
-                        def matcher = #pattern.matcher(#scanner.nextLine());
-                        for k in #matcher.find():({
-                            for groupCount in #matcher.groupCount():({
-                                T(java.lang.System).out.println(#matcher.group(#groupCount));
-                            });
-                        
-                        });
-                        
-                    });
-                });
-                """);
+
+
+
+
+
+//                    def a=[1,2,3,4,5,6];
+//                    #test[2][3][4][5]
+//                    if {1>0} : (print('haha'));
+//                    for i in 1:(print(#i));
+//                    print(1);
+//                    print(true);
+//                    print(false);
+//                    (#a).size();
+
+
+
+//                    def list=new('java.util.ArrayList',2);
+//                    func('hello','name','age',@block{
+//                        print(#list);
+//                        print(#name);
+//                        print(#age);
+//                        return ({ 'nima' + #name + #age });
+//                    });
+//                    #list.add('xiao zhao');
+//                    #list.add('xiao gege');
+//
+//                    print(class(#list).getName());
+
+//                    for i in #list.elementData : ({
+//                        print({hello('小明','12')});
+//                        print(#i);
+//                        print('-------------------------------');
+//                    });
+//                    print(#list.elementData.length);
+
+
+//                  for i in T(java.lang.Long).MAX_VALUE : ({
+//                  })
+//                        print('gaga');
+//                        return ('nima');
+//                        print('gaga');
+//                        print('gaga');
+//                for i in T(java.lang.Long).MAX_VALUE:({
+//                    T(java.lang.System).out.print('输入正则表达式: ');
+//                    def pattern=T(java.util.regex.Pattern).compile(#scanner.nextLine());
+//                    for j in T(java.lang.Long).MAX_VALUE:({
+//                        T(java.lang.System).out.print('输入匹配字符串: ');
+//                        def s=#scanner.nextLine();
+//                        if {#s.equals('0')}:({
+//                            break;
+//                        });
+//                        def matcher = #pattern.matcher(#s);
+//                        if #matcher.find() :({
+//                            for groupCount in #matcher.groupCount():({
+//                                T(java.lang.System).out.println({'第'+#groupCount+'组匹配:'+#matcher.group(#groupCount)});
+//                            });
+//                        });
+//                    });
+//                });
+                """);*/
 //        Scanner.class.getConstructor().newInstance();
 //        System.out.println();
 
-//        evaluate("""
-//                def abc=asdasdasd;
-//
-//                abc==sfd;
-//                if a==23:
-//
-//                for i in range:
-//                abc={}
-//                ;
-//
-//                """);
+/*        evaluate("""
+                def abc=123;
+                def bcd=233;
+                def arg='test';
+                                
+                func('test','arg',@block{
+                    print('------------test-------------');
+                    def abc='inner';
+                    print(#abc);
+                    print(@abc);
+                    print(#bcd);
+                    print(@bcd);
+                    print(#arg);
+                    print(@arg);
+                    
+                    innerFunc('i am arg');
+                });
 
-//        scan();
+                                
+                test('test args');
+                                
+                func('innerFunc','arg',@block{
+                        print('------------innerFunc-------------');
+                        def bcd='innerFunc';
+                        print(#abc);
+                        print(@abc);
+                        print(#bcd);
+                        print(@bcd);
+                        print(#arg);
+                        print(@arg);
+                        #abc='!!';
+                        @abc='!!';
+                });
+                                
+                print(@abc);
+                                
 
-        //try {
-        //                                return token.calculateResult(ANY_TYPE);
-        //                            } catch (Exception e) {
-        //                                throw new EvaluateException("calculate ? result failed",e).errToken(token);
-        //                            }
+                """);*/
+
+        ArrayList<Integer> list = new ArrayList<>();
+        for (int i = 0; i < 100; i++) {
+            list.add((int) (Math.random()*1000));
+        }
+
+        int size = list.size();
+        for (int i = size-1; i >= 1; i--) {
+            for (int j = 0; j < i; j++) {
+                if (list.get(j)>list.get(j+1)){
+                    Integer temp = list.get(j);
+                    list.set(j,list.get(j+1));
+                    list.set(j+1,temp);
+                }
+                System.out.println(list);
+            }
+        }
+        System.out.println(System.currentTimeMillis()-startTime);
+        startTime=System.currentTimeMillis();
+        System.in.read();
+        evaluate("""
+                def list=[];
+                for(i : 1000){
+                    def num=T(java.lang.Math).random()*1000;
+                    #list.add();
+                };
+                func('sort','list',@block{
+                    def size=#list.size();
+                    for(turn @ range(1,#size-1)){
+                        for(i : #turn){
+                            if(#list[#i]>#list[#i+1]){
+                                swap(#list,#i,#i+1);
+                            };
+                        };
+                        print(#list);
+                    };
+                });
+
+                func('swap','list','a','b',@block{
+                    def temp=#list[#a];
+                    #list[#a]=#list[#b];
+                    #list[#b]=#temp;
+                });
+                sort(#list);
+                """);
+
+        System.out.println("总执行时长:" + (System.currentTimeMillis() - startTime));
+        scan();
     }
 
     @SuppressWarnings("InfiniteLoopStatement")
     @SneakyThrows
     public static void scan() {
         Scanner scanner = new Scanner(System.in);
+        StringBuilder builder = new StringBuilder();
+        boolean blockMode = false;
         while (true) {
-            System.out.print("EL-commander-line@FNU # ");
+            System.out.print(blockMode ? "......................> " : "EL-commander-line@FNU # ");
             String line = scanner.nextLine();
-            evaluate(line);
-            System.out.println("\n\n");
+            builder.append(line).append("\n");
+            if (line.endsWith("{")) {
+                blockMode = true;
+            }
+            if (line.matches("} *?(?:\\);|\\))$")) {
+                blockMode = false;
+            }
+            if (!blockMode) {
+                try {
+                    System.out.println(passer.parseExpression(builder.toString()).getValue(context));
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                System.out.println("\n");
+                builder = new StringBuilder();
+            }
         }
     }
 

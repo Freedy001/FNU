@@ -1,14 +1,18 @@
 package com.freedy.tinyFramework.Expression;
 
+import com.freedy.tinyFramework.Expression.stander.StanderTokenBlockSorter;
 import com.freedy.tinyFramework.Expression.token.Assignable;
+import com.freedy.tinyFramework.Expression.token.ObjectToken;
 import com.freedy.tinyFramework.Expression.token.OpsToken;
 import com.freedy.tinyFramework.Expression.token.Token;
 import com.freedy.tinyFramework.exception.EvaluateException;
 import com.freedy.tinyFramework.exception.ExpressionSyntaxException;
 import lombok.Getter;
+import lombok.Setter;
 
 import java.util.*;
 import java.util.function.BiConsumer;
+import java.util.function.Function;
 
 /**
  * @author Freedy
@@ -31,6 +35,8 @@ public class TokenStream implements Executable {
     );//从上往下 优先级逐渐变大
     @Getter
     protected final String expression;
+    @Setter
+    private Function<List<List<Token>>, List<List<Token>>> sorter = new StanderTokenBlockSorter();
 
     // b<a=2+3+(5*4/2)
     // ba2=
@@ -41,6 +47,7 @@ public class TokenStream implements Executable {
 
     private final List<List<Token>> blockStream = new ArrayList<>();
     private final List<List<Token>> suffixCache = new ArrayList<>();
+    private final List<ObjectToken> defTokenList = new ArrayList<>();
 
     public void splitStream() {
         blockStream.add(infixExpression);
@@ -58,6 +65,7 @@ public class TokenStream implements Executable {
             return;
         }
         suffixCache.clear();
+        List<List<Token>> blockStream = sorter.apply(this.blockStream);
         for (int i = 0; i < size; i++) {
             infixExpression = blockStream.get(i);
             setEachTokenContext(context);
@@ -67,10 +75,14 @@ public class TokenStream implements Executable {
         }
     }
 
-    public int blockSize(){
+
+    public int blockSize() {
         return blockStream.size();
     }
 
+    public List<Token> getAllTokens() {
+        return blockStream.stream().flatMap(Collection::stream).toList();
+    }
 
     public static int opsPriority(String ops) {
         for (int i = 0; i < priorityOps.size(); i++) {
@@ -132,7 +144,7 @@ public class TokenStream implements Executable {
             bracketsPares++;
         } else {
             if (bracketsPares == 0) {
-                ExpressionSyntaxException.thrWithMsg("brackets are not paired!", expression, infixExpression.get(infixExpression.size() - 1).getValue() + "@)");
+                ExpressionSyntaxException.thrWithMsg("() are not paired!", expression, (infixExpression.size() == 0 ? "" : infixExpression.get(infixExpression.size() - 1).getValue()) + "@)");
             }
             infixExpression.add(new OpsToken(")"));
             bracketsPares--;
@@ -140,6 +152,9 @@ public class TokenStream implements Executable {
     }
 
     public void addToken(Token token) {
+        if (token.isType("obj")) {
+            defTokenList.add((ObjectToken) token);
+        }
         infixExpression.add(token);
     }
 
@@ -158,7 +173,7 @@ public class TokenStream implements Executable {
     }
 
     public Token getLastToken() {
-        return infixExpression.get(infixExpression.size() - 1);
+        return infixExpression.size() == 0 ? null : infixExpression.get(infixExpression.size() - 1);
     }
 
     // b<a=2+3+(5*4/2)
@@ -307,5 +322,18 @@ public class TokenStream implements Executable {
         }
         return null;
     }
+
+    @Override
+    protected void finalize() throws Throwable {
+        super.finalize();
+        gc(blockStream.get(0).get(0).getContext());
+    }
+
+    public void gc(EvaluationContext context) {
+        for (ObjectToken token : defTokenList) {
+            context.removeVariable(token.getVariableName());
+        }
+    }
+
 
 }
