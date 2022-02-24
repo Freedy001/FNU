@@ -1,9 +1,9 @@
 package com.freedy;
 
-import com.freedy.intranetPenetration.ChannelSentinel;
 import com.freedy.intranetPenetration.OccupyState;
 import com.freedy.intranetPenetration.Protocol;
 import com.freedy.intranetPenetration.instruction.*;
+import com.freedy.intranetPenetration.local.ChannelSentinel;
 import com.freedy.intranetPenetration.local.LocalProp;
 import com.freedy.intranetPenetration.remote.ChanelWarehouse;
 import com.freedy.intranetPenetration.remote.RemoteProp;
@@ -68,7 +68,7 @@ public class ServerStarter {
         return new NioEventLoopGroup(0);
     }
 
-    @Bean
+    @Bean(conditionalOnBeanByType = ReverseProxyProp.class)
     public Channel reverseProxy(ReverseProxyProp reverseProxyProp) throws Exception {
         if (!reverseProxyProp.getEnabled()) return null;
         ServerBootstrap bootstrap = new ServerBootstrap();
@@ -126,7 +126,7 @@ public class ServerStarter {
     }
 
 
-    @Bean
+    @Bean(conditionalOnBeanByType = ReverseProxyProp.class)
     public byte[] pac(ReverseProxyProp reverseProxyProp) {
         if (reverseProxyProp.getJumpEndPoint()) {
             InputStream pacFile = MsgForward.class.getClassLoader().getResourceAsStream("pac");
@@ -171,7 +171,7 @@ public class ServerStarter {
     @Bean(value = "sentinelDaemonThread",conditionalOnBeanByType = LocalProp.class)
     public Thread intranetLocalServer(
             @Inject("remoteChannelMap") Map<Struct.ConfigGroup, List<Channel>> remoteChannelMap,
-            LocalProp localProp, ChannelSentinel sentinel) {
+                LocalProp localProp, ChannelSentinel sentinel) {
         if (!localProp.getEnabled()) return null;
         registerIntranetLocalInstructionHandler();
         //初始化配置消息

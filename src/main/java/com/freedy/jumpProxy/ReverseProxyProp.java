@@ -15,7 +15,7 @@ import lombok.Data;
  */
 @Data
 @NonStrict
-@InjectProperties("proxy.reverse")
+@InjectProperties(value = "proxy.reverse",nonePutIfEmpty = true)
 public class ReverseProxyProp {
 
     private Boolean enabled=false;

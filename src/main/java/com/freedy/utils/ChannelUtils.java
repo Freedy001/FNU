@@ -7,6 +7,7 @@ import com.freedy.intranetPenetration.Protocol;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.AttributeKey;
 
 import java.net.SocketAddress;
@@ -25,6 +26,12 @@ import java.util.regex.Pattern;
 public class ChannelUtils {
 
     private static final AttributeKey<Struct.ConfigGroup> GROUP_INFO = AttributeKey.valueOf("groupInfo");
+    private static final AttributeKey<NioEventLoopGroup> BOSS_EVENT = AttributeKey.valueOf("bossEvent");
+    private static final AttributeKey<Boolean> IS_INIT = AttributeKey.valueOf("isInit");
+    private static final AttributeKey<OccupyState> OCCUPIED = AttributeKey.valueOf("occupied");
+    private static final AttributeKey<Boolean> DESTROY_STATE = AttributeKey.valueOf("destroyState");
+    private static final AttributeKey<byte[]> CMD = AttributeKey.valueOf("cmd");
+    private static final AttributeKey<Integer> FAIL_TIMES=AttributeKey.valueOf("failTimes");
 
     public static Struct.ConfigGroup getGroup(Channel channel) {
         return channel.attr(GROUP_INFO).get();
@@ -34,7 +41,13 @@ public class ChannelUtils {
         channel.attr(GROUP_INFO).set(group);
     }
 
-    private static final AttributeKey<Boolean> IS_INIT = AttributeKey.valueOf("isInit");
+    public static NioEventLoopGroup getBossEvent(Channel channel) {
+        return channel.attr(BOSS_EVENT).get();
+    }
+
+    public static void setBossEvent(Channel channel, NioEventLoopGroup group) {
+        channel.attr(BOSS_EVENT).set(group);
+    }
 
     public static boolean isInit(Channel channel) {
         Boolean isInit = channel.attr(IS_INIT).get();
@@ -45,18 +58,23 @@ public class ChannelUtils {
         channel.attr(IS_INIT).set(state);
     }
 
-    private static final AttributeKey<OccupyState> occupied = AttributeKey.valueOf("occupied");
-
     public static void setOccupy(Channel channel, OccupyState state) {
-        channel.attr(occupied).set(state);
+        channel.attr(OCCUPIED).set(state);
     }
 
     public static OccupyState getOccupy(Channel channel) {
-        return channel.attr(occupied).get();
+        return channel.attr(OCCUPIED).get();
     }
 
-    private static final AttributeKey<Boolean> destroyState = AttributeKey.valueOf("destroyState");
-    private static final AttributeKey<byte[]> cmd = AttributeKey.valueOf("cmd");
+    public static Integer getFileTimes(Channel channel) {
+        return channel.attr(FAIL_TIMES).get();
+    }
+
+    public static void setFailTimes(Channel channel, Integer failTimes) {
+        channel.attr(FAIL_TIMES).set(failTimes);
+    }
+
+
     private final static byte spaceByte = " ".getBytes(StandardCharsets.UTF_8)[0];
 
     public static boolean sendString(Channel channel, String s) {
@@ -72,11 +90,11 @@ public class ChannelUtils {
     }
 
     public static void setDestroyState(Channel channel, boolean state) {
-        channel.attr(destroyState).set(state);
+        channel.attr(DESTROY_STATE).set(state);
     }
 
     public static boolean getDestroyState(Channel channel) {
-        return Optional.ofNullable(channel.attr(destroyState).get()).orElse(false);
+        return Optional.ofNullable(channel.attr(DESTROY_STATE).get()).orElse(false);
     }
 
     public static boolean setCmdAndSendIfAbsent(Channel channel, Protocol.Instruction s) {
@@ -103,16 +121,16 @@ public class ChannelUtils {
         byte[] cmdBytes = new byte[cmdLength];
         Arrays.fill(cmdBytes, spaceByte);
         System.arraycopy(bytes, 0, cmdBytes, 0, length);
-        channel.attr(ChannelUtils.cmd).set(cmdBytes);
+        channel.attr(ChannelUtils.CMD).set(cmdBytes);
     }
 
 
     public static byte[] getCmd(Channel channel) {
-        return channel.attr(cmd).get();
+        return channel.attr(CMD).get();
     }
 
     public static void clearCmd(Channel channel) {
-        channel.attr(cmd).set(null);
+        channel.attr(CMD).set(null);
     }
 
     private final static Pattern pattern = Pattern.compile("(.*?):(.*?)[^\\d]");

@@ -2,6 +2,7 @@ package com.freedy;
 
 import com.freedy.tinyFramework.annotation.beanContainer.PostConstruct;
 import com.freedy.tinyFramework.annotation.prop.InjectProperties;
+import com.freedy.tinyFramework.annotation.prop.NonStrict;
 import com.freedy.tinyFramework.annotation.prop.Skip;
 import com.freedy.tinyFramework.exception.IllegalArgumentException;
 import com.freedy.utils.EncryptUtil;
@@ -16,9 +17,10 @@ import java.nio.charset.StandardCharsets;
  */
 @Data
 @Slf4j
+@NonStrict
 @InjectProperties(value = "encryption",exclude = "log")
 public class EncryptProp {
-    private Boolean enabled;
+    private Boolean enabled=false;
     private String aesKey;
     private Integer authenticationTime;
     @Skip

@@ -1,9 +1,8 @@
-package com.freedy.intranetPenetration;
+package com.freedy.intranetPenetration.local;
 
 import com.freedy.Context;
 import com.freedy.Struct;
-import com.freedy.intranetPenetration.local.ClientConnector;
-import com.freedy.intranetPenetration.local.LocalProp;
+import com.freedy.intranetPenetration.Protocol;
 import com.freedy.tinyFramework.annotation.beanContainer.Inject;
 import com.freedy.tinyFramework.annotation.beanContainer.Part;
 import com.freedy.tinyFramework.annotation.beanContainer.PostConstruct;
@@ -93,9 +92,19 @@ public class ChannelSentinel extends TimerTask {
 
     private void doHeartbeat(List<Channel> channelList) {
         //定时发送心跳包
-        for (Channel channel : channelList) {
+        Iterator<Channel> iterator = channelList.iterator();
+        while (iterator.hasNext()) {
+            Channel channel = iterator.next();
             if (ChannelUtils.isInit(channel)) {
                 ChannelUtils.setCmdAndSendIfAbsent(channel, Protocol.HEARTBEAT_LOCAL_NORMAL_MSG);
+            } else {
+                int failTimes = Optional.ofNullable(ChannelUtils.getFileTimes(channel)).orElse(0);
+                if (failTimes >= 2) {
+                    //6-9秒 无初始化表示握手失败 需要撤掉该channel
+                    iterator.remove();
+                    continue;
+                }
+                ChannelUtils.setFailTimes(channel, failTimes + 1);
             }
         }
     }

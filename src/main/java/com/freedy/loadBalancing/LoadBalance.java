@@ -29,15 +29,19 @@ public abstract class LoadBalance<T> {
     private static volatile Thread sentinelThread;
     private List<Consumer<LoadBalance<T>>> eventList = new CopyOnWriteArrayList<>();
     private long lastZeroTime = 0;
+    @Getter
+    private boolean shutdownMode=false;
 
 
     @SafeVarargs
     public final void registerElementChangeEvent(Consumer<LoadBalance<T>>... event) {
+        shutdownCheck();
         eventList.addAll(Arrays.asList(event));
     }
 
-    @SuppressWarnings("BusyWait")
+
     public final void registerShutdownHook(Runnable runnable) {
+        shutdownCheck();
         shutdownTaskMap.put(this, runnable);
         if (sentinelThread == null) {
             synchronized (shutdownTaskMap) {
@@ -47,22 +51,18 @@ public abstract class LoadBalance<T> {
                     long sleepTime = Context.INTRANET_SERVER_ZERO_CHANNEL_IDLE_TIME;
                     log.info("start load-balance-sentinel thread");
                     while (true) {
-                        LockSupport.park();
-                        try {
-                            Thread.sleep(sleepTime + 1000);
-                            sleepTime = Context.INTRANET_SERVER_ZERO_CHANNEL_IDLE_TIME;
-                        } catch (InterruptedException ignored) {
-                            log.info("Thread sleep is interrupted,that mean the dead load-balance is alive now.");
-                        }
+                        LockSupport.parkNanos(sleepTime);
+                        sleepTime = Context.INTRANET_SERVER_ZERO_CHANNEL_IDLE_TIME;
                         for (Map.Entry<LoadBalance<?>, Runnable> entry : shutdownTaskMap.entrySet()) {
                             LoadBalance<?> loadBalance = entry.getKey();
                             long lastZeroTime = loadBalance.lastZeroTime;
                             if (lastZeroTime == 0) continue;
-                            long waitingTime = now() - lastZeroTime;
+                            long waitingTime = (now() - lastZeroTime) * 1_000_000_000;
                             //检测是否满足回收条件
                             if (waitingTime > Context.INTRANET_SERVER_ZERO_CHANNEL_IDLE_TIME) {
                                 //do hook
                                 log.warn("ready to recycle load-balance{} and execute shutdown hook", loadBalance);
+                                shutdownMode=true;
                                 entry.getValue().run();
                                 loadBalance.lbElement = null;
                                 loadBalance.eventList = null;
@@ -70,11 +70,11 @@ public abstract class LoadBalance<T> {
                                 shutdownTaskMap.remove(loadBalance);
                             } else {
                                 // 时间不够，算出最短时间
-
                                 sleepTime = Math.min(Context.INTRANET_SERVER_ZERO_CHANNEL_IDLE_TIME - waitingTime, sleepTime);
-                                LockSupport.unpark(sentinelThread);
+                                log.debug("ready to re-sleep on {} nanos",sleepTime);
                             }
                         }
+
                     }
                 }, "load-balance-sentinel");
                 sentinelThread.setDaemon(true);
@@ -85,19 +85,21 @@ public abstract class LoadBalance<T> {
 
 
     public int size() {
+        shutdownCheck();
         return lbElement.size();
     }
 
     public void addElement(T element) {
+        shutdownCheck();
         lbElement.add(element);
         eventList.forEach(loadBalanceConsumer -> loadBalanceConsumer.accept(this));
         if (sentinelThread != null && lastZeroTime != 0) {
             lastZeroTime = 0;
-            sentinelThread.interrupt();
         }
     }
 
     public void removeElement(T element) {
+        shutdownCheck();
         if (lbElement.remove(element) && lbElement.size() == 0 && sentinelThread != null) {
             lastZeroTime = now();
             LockSupport.unpark(sentinelThread);
@@ -106,11 +108,13 @@ public abstract class LoadBalance<T> {
     }
 
     public T getElement() {
+        shutdownCheck();
         if (lbElement.size() == 0) return null;
         return supply();
     }
 
     public void setElement(T[] element) {
+        shutdownCheck();
         this.lbElement.clear();
         this.lbElement.addAll(Arrays.asList(element));
         eventList.forEach(loadBalanceConsumer -> loadBalanceConsumer.accept(this));
@@ -118,16 +122,25 @@ public abstract class LoadBalance<T> {
 
 
     public List<T> getAllSafely() {
+        shutdownCheck();
         return new ArrayList<>(lbElement);
     }
 
     public abstract T supply();
 
     public void setAttributes(Object... attr) {
+        shutdownCheck();
         attribute = attr;
     }
 
     private long now() {
         return System.currentTimeMillis();
+    }
+
+
+    private void shutdownCheck() {
+        if (shutdownMode) {
+            throw new UnsupportedOperationException("LoadBalance is in shutdown mode!");
+        }
     }
 }

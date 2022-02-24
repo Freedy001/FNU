@@ -37,14 +37,16 @@ public class LoadBalanceFactory {
         }
     }
 
+
     @SafeVarargs
-    public static <T> LoadBalance<T> produce(String name, T ...element){
-        switch (name){
-            case "Weighted Round Robin"->{
+    public static <T> LoadBalance<T> produce(String name, T... element) {
+        switch (name) {
+            case "Weighted Round Robin" -> {
                 LoadBalance<T> weightedRoundRobin = new WeightedRoundRobin<>();
                 weightedRoundRobin.setElement(element);
                 return weightedRoundRobin;
-            }case "Random"->{
+            }
+            case "Random" -> {
                 LoadBalance<T> random = new Random<>();
                 random.setElement(element);
                 return random;

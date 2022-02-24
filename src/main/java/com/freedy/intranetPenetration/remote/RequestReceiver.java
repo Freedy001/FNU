@@ -14,9 +14,6 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
 /**
  * @author Freedy
  * @date 2021/11/17 21:13
@@ -29,8 +26,6 @@ public class RequestReceiver extends ChannelInboundHandlerAdapter {
     private Channel intranetChannel;
     private int retryCount = 0;
     private int changeTimes = 0;
-    public static final Map<Channel, Channel> intranetReceiverMap = new ConcurrentHashMap<>();
-    public static final Map<Channel, Channel> receiverIntranetMap = new ConcurrentHashMap<>();
 
 
     @Override
@@ -60,8 +55,6 @@ public class RequestReceiver extends ChannelInboundHandlerAdapter {
                 OccupyState.inspectChannelState();
                 //转发信息
                 intranetChannel.writeAndFlush(msg);
-                intranetReceiverMap.put(intranetChannel, receiverChannel);
-                receiverIntranetMap.put(receiverChannel, intranetChannel);
             }else {         //管道繁忙，尝试其他管道
                 if (changeTimes >= lb.size()) {
                     //提交一个任务 等待其他的任务执行完

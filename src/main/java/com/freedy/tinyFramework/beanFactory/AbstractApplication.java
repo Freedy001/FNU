@@ -442,7 +442,7 @@ public abstract class AbstractApplication extends DefaultBeanFactory {
     }
 
 
-    protected void setBean(Object bean) {
+    public void setBean(Object bean) {
         setBean(convertName(bean.getClass().getSimpleName()), bean);
     }
 
@@ -452,7 +452,7 @@ public abstract class AbstractApplication extends DefaultBeanFactory {
      * @param beanName bean名称
      * @param bean     bean对象
      */
-    protected void setBean(String beanName, Object bean) {
+    public void setBean(String beanName, Object bean) {
         injectBean(bean);
         registerBean(beanName, bean);
     }

@@ -1,7 +1,6 @@
 package com.freedy.tinyFramework.utils;
 
 
-import com.freedy.tinyFramework.Expression.stander.LambdaAdapter;
 import com.freedy.tinyFramework.exception.BeanInitException;
 import com.freedy.tinyFramework.exception.IllegalArgumentException;
 import lombok.SneakyThrows;
@@ -215,6 +214,10 @@ public class ReflectionUtils {
             }
         }
         return field;
+    }
+
+    public static boolean hasField(Object obj, String fieldName) {
+        return getFieldRecursion(obj.getClass(), fieldName) != null;
     }
 
     /**
@@ -575,9 +578,7 @@ public class ReflectionUtils {
             }
         }
         int length = args.length;
-        Map<Integer,Class<?>> lambdaIndex = new HashMap<>();
         for (Method method : list) {
-            lambdaIndex.clear();
             if (method.getParameterCount() == length) {
                 Class<?>[] clazz = method.getParameterTypes();
                 int i = 0;
@@ -588,24 +589,13 @@ public class ReflectionUtils {
                         Object o = tryConvert(originMethodArgs, args[i]);
                         if (o != Boolean.FALSE) {
                             args[i] = o;
-                        } else if (supplyMethodArgs == LambdaAdapter.class) {
-                            //根据参数类型构建lambda
-                            lambdaIndex.put(i,originMethodArgs);
-                        } else {
+                        }  else {
                             break;
                         }
                     }
                 }
                 if (i == length) {
                     method.setAccessible(true);
-                    //参数lambda参数替换
-                    if (lambdaIndex.size() > 0) {
-                        lambdaIndex.forEach((index,originMethodArgs)->{
-                            if (args[index] instanceof LambdaAdapter adapter) {
-                                args[index] = adapter.getInstance(originMethodArgs);
-                            }
-                        });
-                    }
                     try {
                         return method.invoke(target, args);
                     } catch (InvocationTargetException e) {

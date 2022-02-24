@@ -19,7 +19,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * 缓存池中的channel状态 <br/>
+ * 缓存池中的channel状态,用于绑定外来连接与内网穿透连接<br/>
  * 该类的设计参考AQS的实现
  *
  * @author Freedy
@@ -33,20 +33,22 @@ public class OccupyState {
     private static final Map<Integer, Queue<ForwardTask>> wakeupMap = new ConcurrentHashMap<>();
     //每个服务对应一个缩容临界值的次数
     private static final Map<Integer, AtomicInteger> shrinkCountMap = new ConcurrentHashMap<>();
-
     //每个服务对应一个是否 检查扩容
     private static final Map<Integer, Struct.BoolWithStamp> checkExpandMap = new ConcurrentHashMap<>();
+    //对应服务的 管道繁忙数量
+    private static final Map<Integer, AtomicInteger> portBusyCount = new ConcurrentHashMap<>();
     //每个服务对应一个是否 检查缩容
     private static final Map<Integer, Boolean> checkShrink = new ConcurrentHashMap<>();
     //对应服务的 管道缓存
     private static Map<Integer, LoadBalance<Channel>> portChannelCache;
-    //对应服务的 管道繁忙数量
-    private static final Map<Integer, AtomicInteger> portBusyCount = new ConcurrentHashMap<>();
 
     public static void initPortChannelCache(Map<Integer, LoadBalance<Channel>> portChannelCache) {
         OccupyState.portChannelCache = portChannelCache;
     }
 
+    /**
+     * 初始化某端口对应的任务队列
+     */
     public static void initTaskQueue(int serverPort) {
         wakeupMap.put(serverPort, new ConcurrentLinkedQueue<>());
         shrinkCountMap.put(serverPort, new AtomicInteger());
@@ -54,11 +56,14 @@ public class OccupyState {
         portBusyCount.put(serverPort, new AtomicInteger());
     }
 
+    /**
+     * 销毁某端口对应的任务队列
+     */
     public static void removeTaskQueue(int serverPort) {
         wakeupMap.remove(serverPort);
         shrinkCountMap.remove(serverPort);
         checkExpandMap.remove(serverPort);
-        portBusyCount.put(serverPort, new AtomicInteger());
+        portBusyCount.remove(serverPort);
     }
 
     public static void inspectChannelState() {
@@ -86,7 +91,7 @@ public class OccupyState {
     private final AtomicInteger shrinkCount;
     private final Struct.BoolWithStamp checkExpand;
     private final AtomicInteger channelBusyCount;
-    private long totalChannel;
+    private int totalChannel;
 
     public OccupyState(Channel intranetChannel, int serverPort) {
         this.intranetChannel = intranetChannel;
@@ -146,25 +151,35 @@ public class OccupyState {
     public boolean tryOccupy(Channel channel) {
         if (occupied.compareAndSet(false, true)) {
             receiverChannel = channel;
-            if (checkExpand.get()) return true;
-            int busyCount = channelBusyCount.incrementAndGet();
-            int expandCount = busyCount + busyCount >> 1 - totalChannel;
+            channelBusyCount.incrementAndGet();
+            receiverChannel.eventLoop().execute(this::doExpand);
+            return true;
+        }
+        return receiverChannel == channel;
+    }
+
+    private void doExpand() {
+        if (checkExpand.get()) return;
+        synchronized (checkExpand) {
+            if (checkExpand.get()) return;
+            int busyCount = channelBusyCount.get();
+            int expandCount = busyCount + (busyCount >> 1) - totalChannel;
             if (expandCount > 0) {
                 /*
                  * 在发送扩容命令后，会让channelCache短时间无法发送扩容命令。
                  * 主要是防止重复提交扩容命令。指定解锁时间，防止通讯消息丢失，导致死锁。
                  */
                 lockExpandCheck(5, TimeUnit.SECONDS);
+                log.info("ready to expand {} channel", expandCount);
                 //need to expand
                 ChannelUtils.setCmd(intranetChannel, Protocol.EXPEND.param(expandCount));
             }
-            return true;
         }
-        return receiverChannel == channel;
     }
 
     public void submitTask(ForwardTask task) {
         taskQueue.offer(task);
+        receiverChannel.eventLoop().execute(this::doExpand);
     }
 
     public void release(Channel channel) {
@@ -178,6 +193,7 @@ public class OccupyState {
             receiverChannel = null;
             occupied.set(false);
             if (Optional.ofNullable(checkShrink.get(serverPort)).orElse(true)) {
+                //缩容
                 shrinkTask();
             }
         } else {
@@ -208,7 +224,7 @@ public class OccupyState {
             intranetChannel.eventLoop().schedule(() -> {
                 try {
                     int bCount = channelBusyCount.get();
-                    //预留1/4的管道缓存空间
+                    //预留1/2的管道缓存空间
                     int shrink = loadBalance.size() - (bCount + (bCount >> 1));
                     if (shrink > 0) {
                         log.info("ready to send shrink command to client,shrink count:{}", shrink);

@@ -10,18 +10,14 @@ import com.freedy.tinyFramework.annotation.beanContainer.Part;
 import com.freedy.tinyFramework.beanFactory.BeanFactory;
 import com.freedy.utils.ChannelUtils;
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.serialization.ObjectDecoder;
 import io.netty.handler.codec.serialization.ObjectEncoder;
 import io.netty.handler.timeout.IdleStateHandler;
-import io.netty.util.Attribute;
-import io.netty.util.AttributeKey;
 import lombok.extern.slf4j.Slf4j;
 
-import java.net.SocketAddress;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -30,7 +26,8 @@ import java.util.concurrent.TimeUnit;
  * @date 2021/11/17 17:57
  */
 @Slf4j
-@Part(type = BeanType.PROTOTYPE)
+@ChannelHandler.Sharable
+@Part(type = BeanType.SINGLETON)
 public class ServerHandshake extends SimpleChannelInboundHandler<String> {
 
     @Inject("remoteServerForBrowserParentChannel")
@@ -70,25 +67,31 @@ public class ServerHandshake extends SimpleChannelInboundHandler<String> {
             }
             Struct.ConfigGroup group = ChannelUtils.getGroup(channel);
             final int remoteServerPort = group.getRemoteServerPort();
-            if (remoteServerForBrowserParentChannel.put(remoteServerPort, fakeChannel)==null) {
-                //启动服务
-                ServerBootstrap bootstrap = new ServerBootstrap();
-                Channel parentChannel = bootstrap.group(new NioEventLoopGroup(1), worker)
-                        .channel(NioServerSocketChannel.class)
-                        .option(ChannelOption.SO_BACKLOG, 10240)
-                        .childHandler(new ChannelInitializer<>() {
-                            @Override
-                            protected void initChannel(Channel channel) {
-                                RequestReceiver requestReceiver = factory.getBean(RequestReceiver.class);
-                                requestReceiver.setLb(portChannelCache.get(remoteServerPort));
-                                channel.pipeline().addLast(
-                                        requestReceiver
-                                );
-                            }
-                        })
-                        .bind(remoteServerPort).sync().channel();
-                remoteServerForBrowserParentChannel.put(remoteServerPort, parentChannel);
-                log.info("Intranet-Remote-Slave-Server started success on http://127.0.0.1:{}/", remoteServerPort);
+            if (!remoteServerForBrowserParentChannel.containsKey(remoteServerPort)) {
+                //noinspection SynchronizeOnNonFinalField
+                synchronized (remoteServerForBrowserParentChannel){
+                    if (remoteServerForBrowserParentChannel.containsKey(remoteServerPort)) return;
+                    //启动服务
+                    ServerBootstrap bootstrap = new ServerBootstrap();
+                    NioEventLoopGroup bossEvent = new NioEventLoopGroup(1);
+                    Channel parentChannel = bootstrap.group(bossEvent, worker)
+                            .channel(NioServerSocketChannel.class)
+                            .option(ChannelOption.SO_BACKLOG, 10240)
+                            .childHandler(new ChannelInitializer<>() {
+                                @Override
+                                protected void initChannel(Channel channel) {
+                                    RequestReceiver requestReceiver = factory.getBean(RequestReceiver.class);
+                                    requestReceiver.setLb(portChannelCache.get(remoteServerPort));
+                                    channel.pipeline().addLast(
+                                            requestReceiver
+                                    );
+                                }
+                            })
+                            .bind(remoteServerPort).sync().channel();
+                    remoteServerForBrowserParentChannel.put(remoteServerPort, parentChannel);
+                    ChannelUtils.setBossEvent(parentChannel,bossEvent);
+                    log.info("Intranet-Remote-Slave-Server started success on http://127.0.0.1:{}/", remoteServerPort);
+                }
             }
 
         }
@@ -96,226 +99,6 @@ public class ServerHandshake extends SimpleChannelInboundHandler<String> {
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-//        cause.printStackTrace();
         log.error("[EXCEPTION]: " + cause.getMessage());
     }
-
-    //ConcurrentHashMap 的value不能为空,所以用这个Channel来代替空值
-    public static final Channel fakeChannel=new Channel(){
-
-        @Override
-        public ChannelId id() {
-            return null;
-        }
-
-        @Override
-        public EventLoop eventLoop() {
-            return null;
-        }
-
-        @Override
-        public Channel parent() {
-            return null;
-        }
-
-        @Override
-        public ChannelConfig config() {
-            return null;
-        }
-
-        @Override
-        public boolean isOpen() {
-            return false;
-        }
-
-        @Override
-        public boolean isRegistered() {
-            return false;
-        }
-
-        @Override
-        public boolean isActive() {
-            return false;
-        }
-
-        @Override
-        public ChannelMetadata metadata() {
-            return null;
-        }
-
-        @Override
-        public SocketAddress localAddress() {
-            return null;
-        }
-
-        @Override
-        public SocketAddress remoteAddress() {
-            return null;
-        }
-
-        @Override
-        public ChannelFuture closeFuture() {
-            return null;
-        }
-
-        @Override
-        public boolean isWritable() {
-            return false;
-        }
-
-        @Override
-        public long bytesBeforeUnwritable() {
-            return 0;
-        }
-
-        @Override
-        public long bytesBeforeWritable() {
-            return 0;
-        }
-
-        @Override
-        public Channel.Unsafe unsafe() {
-            return null;
-        }
-
-        @Override
-        public ChannelPipeline pipeline() {
-            return null;
-        }
-
-        @Override
-        public ByteBufAllocator alloc() {
-            return null;
-        }
-
-        @Override
-        public ChannelFuture bind(SocketAddress localAddress) {
-            return null;
-        }
-
-        @Override
-        public ChannelFuture connect(SocketAddress remoteAddress) {
-            return null;
-        }
-
-        @Override
-        public ChannelFuture connect(SocketAddress remoteAddress, SocketAddress localAddress) {
-            return null;
-        }
-
-        @Override
-        public ChannelFuture disconnect() {
-            return null;
-        }
-
-        @Override
-        public ChannelFuture close() {
-            return null;
-        }
-
-        @Override
-        public ChannelFuture deregister() {
-            return null;
-        }
-
-        @Override
-        public ChannelFuture bind(SocketAddress localAddress, ChannelPromise promise) {
-            return null;
-        }
-
-        @Override
-        public ChannelFuture connect(SocketAddress remoteAddress, ChannelPromise promise) {
-            return null;
-        }
-
-        @Override
-        public ChannelFuture connect(SocketAddress remoteAddress, SocketAddress localAddress, ChannelPromise promise) {
-            return null;
-        }
-
-        @Override
-        public ChannelFuture disconnect(ChannelPromise promise) {
-            return null;
-        }
-
-        @Override
-        public ChannelFuture close(ChannelPromise promise) {
-            return null;
-        }
-
-        @Override
-        public ChannelFuture deregister(ChannelPromise promise) {
-            return null;
-        }
-
-        @Override
-        public Channel read() {
-            return null;
-        }
-
-        @Override
-        public ChannelFuture write(Object msg) {
-            return null;
-        }
-
-        @Override
-        public ChannelFuture write(Object msg, ChannelPromise promise) {
-            return null;
-        }
-
-        @Override
-        public Channel flush() {
-            return null;
-        }
-
-        @Override
-        public ChannelFuture writeAndFlush(Object msg, ChannelPromise promise) {
-            return null;
-        }
-
-        @Override
-        public ChannelFuture writeAndFlush(Object msg) {
-            return null;
-        }
-
-        @Override
-        public ChannelPromise newPromise() {
-            return null;
-        }
-
-        @Override
-        public ChannelProgressivePromise newProgressivePromise() {
-            return null;
-        }
-
-        @Override
-        public ChannelFuture newSucceededFuture() {
-            return null;
-        }
-
-        @Override
-        public ChannelFuture newFailedFuture(Throwable cause) {
-            return null;
-        }
-
-        @Override
-        public ChannelPromise voidPromise() {
-            return null;
-        }
-
-        @Override
-        public <T> Attribute<T> attr(AttributeKey<T> key) {
-            return null;
-        }
-
-        @Override
-        public <T> boolean hasAttr(AttributeKey<T> key) {
-            return false;
-        }
-
-        @Override
-        public int compareTo(Channel o) {
-            return 0;
-        }
-    };
 }

@@ -1,7 +1,6 @@
 package com.freedy.tinyFramework.processor;
 
 import com.alibaba.fastjson.JSON;
-import com.freedy.manage.Response;
 import com.freedy.tinyFramework.RequestInterceptor;
 import com.freedy.tinyFramework.annotation.mvc.*;
 import com.freedy.tinyFramework.beanFactory.BeanFactory;
@@ -372,7 +371,7 @@ public class RestProcessor extends SimpleChannelInboundHandler<FullHttpRequest> 
         response.headers().set(CONNECTION, "keep-alive");
         response.headers().set(SERVER, "FNU power by netty");
         response.headers().set(DATE, new Date());
-        byte[] bytes = JSON.toJSONBytes(Response.err(code, msg));
+        byte[] bytes = JSON.toJSONBytes(Map.of("code", code, "msg", msg));
         response.headers().set(CONTENT_LENGTH, bytes.length);
         response.content().writeBytes(bytes);
         invokePostProcessor(response);

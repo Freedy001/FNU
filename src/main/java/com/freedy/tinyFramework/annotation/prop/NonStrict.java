@@ -3,6 +3,7 @@ package com.freedy.tinyFramework.annotation.prop;
 import java.lang.annotation.*;
 
 /**
+ * <h1> 让属性注入不在是严格模式，即属性不存在时不会报错。</h1>
  * <b>defaultVal属性仅当标注在字段上时才有效</b> <br/>
  * <p>
  * <h1>使用示例:</h1>

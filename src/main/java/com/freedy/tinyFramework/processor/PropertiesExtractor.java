@@ -48,6 +48,7 @@ public class PropertiesExtractor {
             }
             HashMap<String, String> map = new HashMap<>();
             properties.forEach((k, v) -> map.put((String) k, (String) v));
+            System.getProperties().forEach((k, v) -> map.put((String) k, (String) v));
             this.properties = map;
             log.info("配置文件路径: {}", propertyPath);
         } catch (IOException e) {

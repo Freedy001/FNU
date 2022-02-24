@@ -42,6 +42,7 @@ public class BeanException extends RuntimeException {
         exceptionMsg.set(this, new PlaceholderParser(msg, placeholder)
                 .configPlaceholderHighLight(PlaceholderParser.PlaceholderHighLight.HIGH_LIGHT_CYAN)
                 .registerNoneHighLightClass(Throwable.class)
+                .ifEmptyFillWith("")
                 .toString());
     }
 }

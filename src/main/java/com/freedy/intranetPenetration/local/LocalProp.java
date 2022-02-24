@@ -18,7 +18,7 @@ import java.util.List;
 @Data
 @InjectProperties(value = "intranet.local", nonePutIfEmpty = true)
 public class LocalProp {
-    private Boolean enabled;
+    private Boolean enabled=false;
     private Integer minChannelCount;
     private Integer maxChannelCount;
     private List<Config> group;

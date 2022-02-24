@@ -28,6 +28,7 @@ public class HeartBeatLocalNormalMsgHandler implements InstructionHandler {
         Queue<ForwardTask> taskQueue = occupy.getTaskQueue();
         if (taskQueue.size() == 0) return true;
         ForwardTask task = taskQueue.poll();
+        if (task == null) return true;
         if (occupy.tryOccupy(task.receiverChannel())) {
             ctx.executor().execute(() -> task.execute(intranetChannel));
             occupy.executeSameReceiverTask(task);

@@ -19,7 +19,7 @@ public class Context {
     //连接失败次数
     public final static int INTRANET_MAX_BAD_CONNECT_TIMES = 90;
     //当服务的管道为0时，需要空闲多久关闭该服务
-    public final static int INTRANET_SERVER_ZERO_CHANNEL_IDLE_TIME = 1_000 * 60 * 60 * 30; //半小时
+    public final static long INTRANET_SERVER_ZERO_CHANNEL_IDLE_TIME = 5 * 1_000_000_000L; //5s
     //指定最大长度
     public final static int CMD_LENGTH = 28;
     //换行符
