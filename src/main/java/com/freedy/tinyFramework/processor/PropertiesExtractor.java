@@ -38,7 +38,7 @@ public class PropertiesExtractor {
     public PropertiesExtractor() {
         Properties properties = new Properties();
         try {
-            File file = new File("./conf.properties");
+            File file = new File(Optional.ofNullable(System.getProperty("global.prop")).orElse("./conf.properties"));
             if (file.exists()) {
                 properties.load(new FileInputStream(file));
                 propertyPath = file.getAbsolutePath();
