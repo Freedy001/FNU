@@ -50,7 +50,7 @@ public class PropertiesExtractor {
             properties.forEach((k, v) -> map.put((String) k, (String) v));
             System.getProperties().forEach((k, v) -> map.put((String) k, (String) v));
             this.properties = map;
-            log.info("配置文件路径: {}", propertyPath);
+            log.info("config file path: {}", propertyPath);
         } catch (IOException e) {
             throw new BeanInitException("load properties failed,because ?", e);
         }

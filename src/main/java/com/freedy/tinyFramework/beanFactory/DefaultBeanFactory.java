@@ -7,6 +7,8 @@ import com.freedy.tinyFramework.utils.StringUtils;
 import lombok.extern.slf4j.Slf4j;
 
 import java.lang.management.ManagementFactory;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
@@ -139,6 +141,7 @@ public abstract class DefaultBeanFactory implements BeanFactory {
         String[] split = name.split("@");
         log.info("current pid: {}" , split[0]);
         log.info("current computer name: {}" , split[1]);
+        log.info("start time: {}", DateTimeFormatter.ofPattern("yyyy-MM-dd hh:mm:ss").format(LocalDateTime.now()));
     }
 
     @Override

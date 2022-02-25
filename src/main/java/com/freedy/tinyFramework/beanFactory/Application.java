@@ -43,7 +43,7 @@ public class Application extends AbstractApplication {
     public Application run() {
         long startTime = System.currentTimeMillis();
         if (packageName == null && excludePackage == null)
-            throw new ApplicationHasStartedException("!!!!!!!!!!!!!!application has started!!!!!!!!!!!!!!");
+            throw new ApplicationHasStartedException("application has started!");
         scan(packageName, excludePackage);
         productBean();
         if (port>=0) {
