@@ -18,19 +18,18 @@ Author:Freedy Version:1.0.0           GigHub:https://github.com/Freedy001/FNU
 
 ## 使用
 
-1. 下载jar包
+1. 下载zip包(或手动下载)
     ```shell
-    wget https://github.com/Freedy001/FNU/releases/download/1.0.0/netUtils-1.0.0.jar
+    wget https://github.com/Freedy001/FNU/releases/download/2.0.0/fnu2.0.0.zip
     ```
 
-2. 下载配置文件
+2. 解压(或手动解压)
     ```shell
     wget https://github.com/Freedy001/FNU/releases/download/1.0.0/conf.properties
     ```
 
 3. 修改配置文件(详细配置见下面配置文件专栏)
-4. 安装jdk17
-5. java -jar netUtils-1.0.0.jar
+4. 运行start.sh/start.bat启动
 
 ## 开发
 
@@ -82,16 +81,21 @@ Author:Freedy Version:1.0.0           GigHub:https://github.com/Freedy001/FNU
 ### 反向代理
 
 ```properties
+
 # 是否启用
-reverse.proxy.start=false
+proxy.reverse.enabled=false
 # 反向代理服务器启动端口
-reverse.proxy.port=8900
+proxy.reverse.port=2020
+# 表示是否是反向代理的终端节点
+# 当配置有多个反向代理的时候只有终端节点需要对数据进行加密与解密
+# 若为单机反向代理请务必设为false应该设为true会对代理的数据进行加密与解密，可能导致服务器收到的数据为加密数据
+proxy.reverse.jumpEndPoint=true
 # 需要被反向代理服务的地址多个用(,)隔开
-reverse.proxy.server.address=127.0.0.1:1345
+proxy.reverse.serverAddress=127.0.0.1:1010
 # 负载均衡算法，默认轮询(Round Robin,Weighted Round Robin,Source IP Hash,Random)
-reverse.proxy.loadBalancing.algorithm=Round Robin
+proxy.reverse.BalanceAlgorithm=Round Robin
 # 加权轮询时每个地址的权重,其数量必须和reverse.proxy.server.address的数量一致
-reverse.proxy.loadBalancing.algorithm.weight=1,1,1,1
+proxy.reverse.BalanceAlgorithmWeight=1,1,1,1
 ```
 
 ### HTTP代理
@@ -100,35 +104,12 @@ reverse.proxy.loadBalancing.algorithm.weight=1,1,1,1
 
 ```properties
 #是否启用
-proxy.start=false
+proxy.http.enabled=false
 #启动端口
-proxy.port=9090
-```
-
-- 有跳板的http代理
-
-跳板节点配置
-
-```properties
-#是否启用
-jump.local.start=true
-#启动端口
-jump.local.server.port=8900
-#下一个跳板或者终点服务地址,多个用(,)分割
-jump.local.connect.address=127.0.0.1:8100
-# 负载均衡算法，默认轮询(Round Robin,Weighted Round Robin,Source IP Hash,Random)
-jump.local.loadBalancing.algorithm=Random
-# 加权轮询时每个地址的权重,其数量必须和reverse.proxy.server.address的数量一致
-jump.local.loadBalancing.algorithm.weight=1,1,1,1
-```
-
-终点节点配置
-
-```properties
-#是否启用
-jump.remote.start=true
-#启动端口
-jump.remote.server.port=8100
+proxy.http.port=1010
+# 表示是否是HTTP代理的终端节点
+# 同上proxy.reverse.jumpEndPoint属性
+proxy.http.jumpEndPoint=true
 ```
 
 ### 内网穿透
@@ -137,20 +118,20 @@ jump.remote.server.port=8100
 
 ```properties
 #是否启用
-intranet.local.start=true
+intranet.local.enabled=false
 #管道缓存的最小数量
-intranet.local.cache.channel.minSize=30  	
+intranet.local.minChannelCount=5
 #管道缓存的最大数量
-intranet.local.cache.channel.maxSize=10000 
-#需要穿透的本地服务地址
-intranet.local.group.localServerAddress=127.0.0.1:4567  
-#内网穿透服务端的地址
-intranet.local.group.remoteIntranetAddress=127.0.0.1:7777 
-#期望被穿透的服务在远程启用的端口
-intranet.local.group.remoteServerPort=7892 
+intranet.local.maxChannelCount=999999
+#内网穿透服务端的地址(多个用英文逗号(,)分割)
+intranet.local.group.localServerAddress=106.14.177.142:80
+#内网穿透服务端的地址(多个用英文逗号(,)分割)
+intranet.local.group.remoteIntranetAddress=127.0.0.1:7777
+#期望被穿透的服务在远程启用的端口(多个用英文逗号(,)分割)
+intranet.local.group.remoteServerPort=9999
 ```
 
-`管道缓存的最小数量`   `管道缓存的最大数量` 一般就用默认设置.除非并发量比较大且你的服务器足够好,则可以把初始容量设置很大,这样就不会应为管道数量扩容而导致服务访问缓慢.
+`管道缓存的最小数量`   `管道缓存的最大数量` 一般就用默认设置,他会根据访问量进行动态扩容与缩容。
 
 `intranet.local.group.localServerAddress,intranet.local.group.remoteIntranetAddress,intranet.local.group.remoteServerPort`
 
@@ -162,7 +143,7 @@ intranet.local.group.localServerAddress=127.0.0.1:1234,127.0.0.1:5678
 # 对应同一个服务端
 intranet.local.group.remoteIntranetAddress=127.0.0.1:7777,127.0.0.1:7777
 #在服务端的2345,3456端口分别对外提供本地端对应的127.0.0.1:1234与127.0.0.1:5678的服务
-intranet.local.group.remoteServerPort=2345,3456 
+intranet.local.group.remoteServerPort=2345,3456
 ```
 
 - 服务端配置
@@ -171,14 +152,14 @@ intranet.local.group.remoteServerPort=2345,3456
 
 ```properties
 # 是否启用
-intranet.remote.start=true
+intranet.remote.enabled=false
 # 服务端启动的端口
 intranet.remote.port=7777
 # 对管道缓存池中的管道采用的负载均衡算法
-intranet.remote.channel.loadBalancing=Round Robin
+intranet.remote.loadBalancing=Round Robin
 ```
 
-负载均衡算法在以下可选
+负载均衡算法在以下可选(一般都用第一个，其他的没做测试可能有bug)
 
 1. Round Robin (轮询算法,默认为该算法)
 
@@ -191,49 +172,63 @@ intranet.remote.channel.loadBalancing=Round Robin
 
 ```properties
 #是否启用
-encryption.start=true
+encryption.enabled=false
 #采用aes对称加密  密钥
-encryption.aes.key=$@!;POI{}2?.++=-
+encryption.aesKey=$@!;POI{}2?.+fs=
 # 认证头信息MD5加密次数,其工作原理是对aes密钥进行多次MD5加密
 encryption.authenticationTime=3
+```
+
+### 开发者选项(启动远程调试功能)
+```properties
+#是否启动
+expression.enabled=true
+#启动端口
+expression.port=98
+#对称加密aesKey
+expression.aesKey=abcdefrtgszxcsqw
+#消息头认证key
+expression.auth=asfasfasfasfasx
 ```
 
 ### 完整配置
 
 ```properties
-#============================== 本地跳跃Http代理 ==============================
-jump.local.start=true
-jump.local.server.port=8900
-jump.local.connect.address=127.0.0.1:8100
-# 负载均衡算法，默认轮询(Round Robin,Weighted Round Robin,Source IP Hash,Random)
-jump.local.loadBalancing.algorithm=Random
-jump.local.loadBalancing.algorithm.weight=1,1,1,1
-#============================== 远程JumpHttp代理 ==============================
-jump.remote.start=true
-jump.remote.server.port=8100
-#============================== Http代理 ==============================
-proxy.start=false
-proxy.port=9090
+# suppress inspection "UnusedProperty" for whole file
 #============================== 内网穿透客户端 ==============================
-intranet.local.start=true
-intranet.local.cache.channel.minSize=1
-intranet.local.cache.channel.maxSize=999999
-intranet.local.group.localServerAddress=127.0.0.1:4567
-intranet.local.group.remoteIntranetAddress=127.0.0.1:7777
-intranet.local.group.remoteServerPort=7892
+intranet.local.enabled=false
+intranet.local.minChannelCount=5
+intranet.local.maxChannelCount=999999
+intranet.local.group.localServerAddress=106.14.177.142:80,127.0.0.1:98
+intranet.local.group.remoteIntranetAddress=127.0.0.1:7777,127.0.0.1:7777
+intranet.local.group.remoteServerPort=9999,7788
 #============================== 内网穿透服务端 ==============================
-intranet.remote.start=true
+intranet.remote.enabled=false
 intranet.remote.port=7777
-intranet.remote.channel.loadBalancing=Round Robin
+intranet.remote.loadBalancing=Round Robin
+
 #============================== 反向代理 ==============================
-reverse.proxy.start=false
-reverse.proxy.port=8900
-reverse.proxy.server.address=127.0.0.1:1345
-# 负载均衡算法，默认轮询(Round Robin,Weighted Round Robin,Source IP Hash,Random)
-reverse.proxy.loadBalancing.algorithm=Round Robin
-reverse.proxy.loadBalancing.algorithm.weight=1,1,1,1
+proxy.reverse.enabled=false
+proxy.reverse.port=2020
+proxy.reverse.jumpEndPoint=true
+proxy.reverse.serverAddress=127.0.0.1:1010
+proxy.reverse.BalanceAlgorithm=Round Robin
+proxy.reverse.BalanceAlgorithmWeight=1,1,1,1
+
+#============================== http代理 ==============================
+proxy.http.enabled=false
+proxy.http.port=1010
+proxy.http.jumpEndPoint=true
+
 #============================== 加密配置 ==============================
-encryption.start=true
-encryption.aes.key=$@@@POI{}2?.++=-
+encryption.enabled=false
+encryption.aesKey=$@!;POI{}2?.+fs=
 encryption.authenticationTime=3
+
+
+#============================== expression ==============================
+expression.enabled=true
+expression.port=98
+expression.aesKey=abcdefrtgszxcsqw
+expression.auth=asfasfasfasfasx
 ```
