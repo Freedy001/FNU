@@ -13,7 +13,7 @@
 \ \ \ \  |  __/ (_) \ V  V /  __/ |    | |_) | |_| |    |  _| | |\  | |_| |
  \_\_\_\ |_|   \___/ \_/\_/ \___|_|    |____/ \__, |    |_|   |_| \_|\___/ 
                                               |___/                        
-Author:Freedy Version:1.0.0           GigHub:https://github.com/Freedy001/FNU
+Author:Freedy Version:2.0.0           GigHub:https://github.com/Freedy001/FNU
 </pre>
 
 ## 使用
@@ -67,6 +67,8 @@ Author:Freedy Version:1.0.0           GigHub:https://github.com/Freedy001/FNU
     |      |
     |      |------remote           HTTP代理
     |
+    |------tinyFramework           模仿Spring实现的IOC容器
+    |
     |------loadBalancing           负载均衡
     |
     |------log                     日志样式
@@ -79,11 +81,15 @@ Author:Freedy Version:1.0.0           GigHub:https://github.com/Freedy001/FNU
     |
     |------Context                 全局配置
     |
-    |------Start                   主启动类
+    |------FNUApplication          主启动类
     </pre>
 
+3. 添加JVM启动参数(在`启动按钮->修改运行配置->修改选项->添加VM选项`中)
+```shell
+  --add-opens java.base/java.lang=ALL-UNNAMED --add-opens java.base/java.util=ALL-UNNAMED --add-opens java.base/jdk.internal.misc=ALL-UNNAMED --add-opens java.base/jdk.internal.loader=ALL-UNNAMED --add-opens java.base/java.security=ALL-UNNAMED
+```
 
-3. 在Start类点击运行
+4. 在FNUApplication类点击运行
 
 ## 配置
 
