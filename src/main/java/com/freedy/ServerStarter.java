@@ -37,10 +37,9 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.InputStream;
-import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * @author Freedy
@@ -161,7 +160,7 @@ public class ServerStarter {
      * 内网穿透本地服务 配置信息与之对应的缓存管道map
      */
     @Bean("remoteChannelMap")
-    public Map<Struct.ConfigGroup, List<Channel>> intranetLocalServer() {
+    public Map<Struct.ConfigGroup, Set<Channel>> intranetLocalServer() {
         return new ConcurrentHashMap<>();
     }
 
@@ -170,13 +169,13 @@ public class ServerStarter {
      */
     @Bean(value = "sentinelDaemonThread",conditionalOnBeanByType = LocalProp.class)
     public Thread intranetLocalServer(
-            @Inject("remoteChannelMap") Map<Struct.ConfigGroup, List<Channel>> remoteChannelMap,
+            @Inject("remoteChannelMap") Map<Struct.ConfigGroup, Set<Channel>> remoteChannelMap,
                 LocalProp localProp, ChannelSentinel sentinel) {
         if (!localProp.getEnabled()) return null;
         registerIntranetLocalInstructionHandler();
         //初始化配置消息
         for (Struct.ConfigGroup group : localProp.getConfigGroupList()) {
-            remoteChannelMap.put(group, new CopyOnWriteArrayList<>());
+            remoteChannelMap.put(group, ConcurrentHashMap.newKeySet());
         }
         //开始连接客户端
         Thread sentinelDaemonThread = new Thread(sentinel, "Channel Sentinel Daemon Thread");

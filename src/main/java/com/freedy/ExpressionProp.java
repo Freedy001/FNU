@@ -27,7 +27,7 @@ public class ExpressionProp {
 
 
 
-    @Inject
+    @Inject(failFast = true)
     public void init(Application app) {
         if (!enabled) return;
         if (aesKey.length() != 16) throw new IllegalArgumentException("aes-key's length must be 16");

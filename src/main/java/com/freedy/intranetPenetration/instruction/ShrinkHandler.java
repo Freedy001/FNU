@@ -9,8 +9,8 @@ import com.freedy.utils.ChannelUtils;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 
-import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * @author Freedy
@@ -21,7 +21,7 @@ public class ShrinkHandler implements InstructionHandler {
 
 
     @Inject("remoteChannelMap")
-    private Map<Struct.ConfigGroup, List<Channel>> remoteChannelMap;
+    private Map<Struct.ConfigGroup, Set<Channel>> remoteChannelMap;
 
     @Inject
     private LocalProp prop;

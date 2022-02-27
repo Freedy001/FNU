@@ -17,9 +17,9 @@ import io.netty.handler.codec.serialization.ObjectDecoder;
 import io.netty.handler.codec.serialization.ObjectEncoder;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * @author Freedy
@@ -32,7 +32,7 @@ public class ClientConnector {
     @Inject
     private Bootstrap bootstrap;
     @Inject("remoteChannelMap")
-    private Map<Struct.ConfigGroup, List<Channel>> remoteChannelMap;
+    private Map<Struct.ConfigGroup, Set<Channel>> remoteChannelMap;
     @Inject
     private BeanFactory factory;
     @Inject
@@ -61,12 +61,8 @@ public class ClientConnector {
             log.debug("[client]发送配置消息[{}]", group);
             channel.writeAndFlush(group);
 
-            List<Channel> list = remoteChannelMap.get(group);
-            if (list == null) {
-                list = new CopyOnWriteArrayList<>();
-                remoteChannelMap.put(group, list);
-            }
-            list.add(channel);
+            Set<Channel> set = remoteChannelMap.computeIfAbsent(group, k -> ConcurrentHashMap.newKeySet());
+            set.add(channel);
         } catch (Exception e) {
             log.error("[EXCEPTION]: {}", e.getMessage());
             return false;

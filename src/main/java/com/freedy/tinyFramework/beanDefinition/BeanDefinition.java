@@ -17,8 +17,8 @@ public abstract class BeanDefinition {
     protected String beanName;
     protected Class<?> beanClass;
     protected BeanType type=BeanType.SINGLETON;
-    protected Method postConstruct;
-    protected List<Method> injectMethods;
+    protected List<DelayMethod> postConstruct;
+    protected List<DelayMethod> injectMethods;
 
     public BeanDefinition(){}
 
@@ -27,19 +27,24 @@ public abstract class BeanDefinition {
         this.beanClass = beanClass;
     }
 
-    public void setPostConstruct(Method postConstruct){
-        postConstruct.setAccessible(true);
-        this.postConstruct=postConstruct;
+    public void addPostConstruct(DelayMethod delayMethod){
+        delayMethod.relevantMethod.setAccessible(true);
+        if (postConstruct==null){
+            postConstruct=new ArrayList<>();
+        }
+        postConstruct.add(delayMethod);
     }
 
-    public void addInjectMethods(Method injectMethod){
-        injectMethod.setAccessible(true);
+    public void addInjectMethods(DelayMethod delayMethod){
+        delayMethod.relevantMethod.setAccessible(true);
         if (injectMethods==null){
             injectMethods=new ArrayList<>();
         }
-        injectMethods.add(injectMethod);
+        injectMethods.add(delayMethod);
     }
 
+
+    public record DelayMethod(Method relevantMethod, boolean failFast){};
 
 
 }

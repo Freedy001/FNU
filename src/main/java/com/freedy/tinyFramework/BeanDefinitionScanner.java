@@ -131,13 +131,15 @@ public class BeanDefinitionScanner implements Scanner {
 
     private void findInjectMethodOrPostConstructMethod(Class<?> baseClass, BeanDefinition beanDefinition) {
         for (Method method : baseClass.getDeclaredMethods()) {
-            if (method.getAnnotation(PostConstruct.class) != null) {
+            PostConstruct post = method.getAnnotation(PostConstruct.class);
+            if (post != null) {
                 if (method.getParameterCount() != 0)
                     throw new BeanException("post-construct method should not have parameters");
-                beanDefinition.setPostConstruct(method);
+                beanDefinition.addPostConstruct(new BeanDefinition.DelayMethod(method,post.failFast()));
             }
-            if (method.getAnnotation(Inject.class) != null)
-                beanDefinition.addInjectMethods(method);
+            Inject inject = method.getAnnotation(Inject.class);
+            if (inject != null)
+                beanDefinition.addInjectMethods(new BeanDefinition.DelayMethod(method,inject.failFast()));
         }
     }
 

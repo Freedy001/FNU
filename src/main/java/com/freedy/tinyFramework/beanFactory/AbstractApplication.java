@@ -231,8 +231,12 @@ public abstract class AbstractApplication extends DefaultBeanFactory {
                     throw new InjectException("inject field ? failed,because ?", field.getName(), e);
                 }
             }
-            //执行PostConstruct 和 inject方法
-            invokePostConstruct(bean, definition);
+            try {
+                //执行PostConstruct 和 inject方法
+                invokePostConstruct(bean, definition);
+            } catch (Throwable e) {
+                e.printStackTrace();
+            }
 
             //移除二级缓存，表示该对象创建完毕
             earlySingletonObject.remove(beanName);
@@ -402,22 +406,38 @@ public abstract class AbstractApplication extends DefaultBeanFactory {
     }
 
     private void invokePostConstruct(Object bean, BeanDefinition definition) {
-        Method postConstruct = definition.getPostConstruct();
+        List<BeanDefinition.DelayMethod> postConstruct = definition.getPostConstruct();
         if (postConstruct != null) {
-            try {
-                postConstruct.invoke(bean);
-            } catch (Exception e) {
-                throw new BeanException("invoke post-construct method[?] failed,because ?", postConstruct, e);
+            for (BeanDefinition.DelayMethod delayMethod : postConstruct) {
+                Method method = delayMethod.relevantMethod();
+                try {
+                    method.invoke(bean);
+                } catch (Throwable e) {
+                    BeanException ex = new BeanException("invoke post-construct method[?] failed,because ?", method, e);
+                    if (delayMethod.failFast()) {
+                        ex.printStackTrace();
+                        System.exit(0);
+                    } else {
+                        throw ex;
+                    }
+                }
             }
         }
-        List<Method> injectMethods = definition.getInjectMethods();
+        List<BeanDefinition.DelayMethod> injectMethods = definition.getInjectMethods();
         if (injectMethods != null) {
-            for (Method method : injectMethods) {
-                List<Object> args = getArgumentsFromBeanContainer(method);
+            for (BeanDefinition.DelayMethod delayMethod : injectMethods) {
+                Method relevantMethod = delayMethod.relevantMethod();
+                List<Object> args = getArgumentsFromBeanContainer(relevantMethod);
                 try {
-                    method.invoke(bean, args.toArray());
-                } catch (Exception e) {
-                    throw new BeanException("invoke inject-methods method failed,because ?", e);
+                    relevantMethod.invoke(bean, args.toArray());
+                } catch (Throwable e) {
+                    BeanException ex = new BeanException("invoke inject-methods[?] failed,because ?",relevantMethod, e);
+                    if (delayMethod.failFast()){
+                       ex.printStackTrace();
+                       System.exit(0);
+                   }else {
+                       throw ex;
+                   }
                 }
             }
         }

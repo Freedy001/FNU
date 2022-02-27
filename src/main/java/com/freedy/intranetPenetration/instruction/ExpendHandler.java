@@ -11,8 +11,8 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * @author Freedy
@@ -26,7 +26,7 @@ public class ExpendHandler implements InstructionHandler {
     private ClientConnector clientConnector;
 
     @Inject("remoteChannelMap")
-    private Map<Struct.ConfigGroup, List<Channel>> remoteChannelMap;
+    private Map<Struct.ConfigGroup, Set<Channel>> remoteChannelMap;
 
     @Inject
     private LocalProp prop;

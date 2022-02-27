@@ -12,4 +12,6 @@ import java.lang.annotation.*;
 public @interface Inject {
     //通过名称注入 不填按照类型注入
     String value() default "";
+    //仅当标注在方法上有用，当发生异常整个程序将会终止
+    boolean failFast() default false;
 }

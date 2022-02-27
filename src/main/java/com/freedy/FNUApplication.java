@@ -1,6 +1,5 @@
 package com.freedy;
 
-import com.freedy.tinyFramework.annotation.WebApplication;
 import com.freedy.tinyFramework.beanFactory.Application;
 import lombok.extern.slf4j.Slf4j;
 
@@ -10,7 +9,6 @@ import lombok.extern.slf4j.Slf4j;
  * @date 2021/11/21 12:20
  */
 @Slf4j
-@WebApplication(port = 9000)
 public class FNUApplication {
 
 

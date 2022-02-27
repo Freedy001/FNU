@@ -29,7 +29,7 @@ public class ChannelSentinel extends TimerTask {
     private ClientConnector clientConnector;
 
     @Inject("remoteChannelMap")
-    private Map<Struct.ConfigGroup, List<Channel>> remoteChannelMap;
+    private Map<Struct.ConfigGroup, Set<Channel>> remoteChannelMap;
 
     @Inject
     private LocalProp prop;
@@ -59,7 +59,7 @@ public class ChannelSentinel extends TimerTask {
         } while (true);
     }
 
-    public void doCheck(Struct.ConfigGroup group, List<Channel> channelList) {
+    public void doCheck(Struct.ConfigGroup group, Set<Channel> channelList) {
         executor.submit(() -> {
             int size = channelList.size();
             Integer bConn = Optional.ofNullable(groupBadConnectTimes.get(group)).orElse(0);
@@ -90,18 +90,16 @@ public class ChannelSentinel extends TimerTask {
     }
 
 
-    private void doHeartbeat(List<Channel> channelList) {
+    private void doHeartbeat(Set<Channel> channelList) {
         //定时发送心跳包
-        Iterator<Channel> iterator = channelList.iterator();
-        while (iterator.hasNext()) {
-            Channel channel = iterator.next();
+        for (Channel channel : channelList) {
             if (ChannelUtils.isInit(channel)) {
                 ChannelUtils.setCmdAndSendIfAbsent(channel, Protocol.HEARTBEAT_LOCAL_NORMAL_MSG);
             } else {
                 int failTimes = Optional.ofNullable(ChannelUtils.getFileTimes(channel)).orElse(0);
                 if (failTimes >= 2) {
                     //6-9秒 无初始化表示握手失败 需要撤掉该channel
-                    iterator.remove();
+                    channelList.remove(channel);
                     continue;
                 }
                 ChannelUtils.setFailTimes(channel, failTimes + 1);

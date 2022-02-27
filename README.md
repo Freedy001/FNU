@@ -25,11 +25,20 @@ Author:Freedy Version:1.0.0           GigHub:https://github.com/Freedy001/FNU
 
 2. 解压(或手动解压)
     ```shell
-    wget https://github.com/Freedy001/FNU/releases/download/1.0.0/conf.properties
+    unzip fnu2.0.0.zip #没有该命令需要安装
     ```
 
 3. 修改配置文件(详细配置见下面配置文件专栏)
-4. 运行start.sh/start.bat启动
+   ```shell
+   cd fnu2.0.0
+   vim conf.properties #相关配置见下面
+  ```
+
+4. 运行start.sh/start.bat启动,或者使用backStart.sh后台启动
+      ```shell
+   chmod 777 ./*
+   ./start.sh
+  ```
 
 ## 开发
 
