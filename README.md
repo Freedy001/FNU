@@ -32,13 +32,19 @@ Author:Freedy Version:2.0.0           GigHub:https://github.com/Freedy001/FNU
    ```shell
    cd fnu2.0.0
    vim conf.properties #相关配置见下面
-  ```
 
 4. 运行start.sh/start.bat启动,或者使用backStart.sh后台启动
-      ```shell
+    ```shell
    chmod 777 ./*
    ./start.sh
-  ```
+
+> 如果是后台运行可以使用JPS查看是否启动成功
+>
+> 使用./log.sh可以实时查看日志
+>
+> 日志文件保存在同级目录的proxy.log文件中
+>
+> 使用./backStop.sh可以停止服务
 
 ## 开发
 
@@ -86,10 +92,10 @@ Author:Freedy Version:2.0.0           GigHub:https://github.com/Freedy001/FNU
 
 3. 添加JVM启动参数(在`启动按钮->修改运行配置->修改选项->添加VM选项`中)
 ```shell
-  --add-opens java.base/java.lang=ALL-UNNAMED --add-opens java.base/java.util=ALL-UNNAMED --add-opens java.base/jdk.internal.misc=ALL-UNNAMED --add-opens java.base/jdk.internal.loader=ALL-UNNAMED --add-opens java.base/java.security=ALL-UNNAMED
+--add-opens java.base/java.lang=ALL-UNNAMED --add-opens java.base/java.util=ALL-UNNAMED --add-opens java.base/jdk.internal.misc=ALL-UNNAMED --add-opens java.base/jdk.internal.loader=ALL-UNNAMED --add-opens java.base/java.security=ALL-UNNAMED
 ```
 
-4. 在FNUApplication类点击运行
+4. 在FNUApplication类(这个类启动类似于Springboot会扫描包)点击运行
 
 ## 配置
 
