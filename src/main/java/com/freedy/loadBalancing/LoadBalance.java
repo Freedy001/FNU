@@ -40,6 +40,10 @@ public abstract class LoadBalance<T> {
     }
 
 
+    /**
+     * 当lbElement为空时，间隔一段时间执行传入的钩子函数 <br/>
+     * 间隔时间由{@link Context#INTRANET_SERVER_ZERO_CHANNEL_IDLE_TIME}控制
+     */
     public final void registerShutdownHook(Runnable runnable) {
         shutdownCheck();
         shutdownTaskMap.put(this, runnable);
