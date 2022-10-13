@@ -1,6 +1,6 @@
 package com.freedy;
 
-import com.freedy.expression.CommanderLine;
+import com.freedy.expression.ScriptStarter;
 import com.freedy.expression.stander.StanderEvaluationContext;
 import com.freedy.tinyFramework.annotation.beanContainer.Inject;
 import com.freedy.tinyFramework.annotation.prop.InjectProperties;
@@ -31,7 +31,7 @@ public class ExpressionProp {
     public void init(Application app) {
         if (!enabled) return;
         if (aesKey.length() != 16) throw new IllegalArgumentException("aes-key's length must be 16");
-        CommanderLine.setContext(new StanderEvaluationContext() {
+        ScriptStarter.setContext(new StanderEvaluationContext() {
             @Override
             public Object getVariable(String name) {
                 Object variable = super.getVariable(name);
@@ -55,7 +55,7 @@ public class ExpressionProp {
                 return set;
             }
         });
-        CommanderLine.startRemote(port,aesKey,auth);
+        ScriptStarter.startRemote(port,aesKey,auth);
     }
 
 }

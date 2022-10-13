@@ -22,6 +22,7 @@ import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
+import io.netty.channel.ChannelPipeline;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
@@ -30,13 +31,16 @@ import io.netty.handler.codec.LengthFieldPrepender;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpRequestDecoder;
 import io.netty.handler.codec.http.HttpResponseEncoder;
+import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.serialization.ClassResolvers;
 import io.netty.handler.codec.serialization.ObjectDecoder;
 import io.netty.handler.codec.serialization.ObjectEncoder;
+import io.netty.handler.stream.ChunkedWriteHandler;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.InputStream;
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -63,8 +67,29 @@ public class ServerStarter {
     private NioEventLoopGroup worker;
 
     @Bean
-    public NioEventLoopGroup work(){
+    public NioEventLoopGroup work() {
         return new NioEventLoopGroup(0);
+    }
+
+    @Bean(conditionalOnBeanByType = StaticServerProp.class)
+    public Channel staticServer(StaticServerProp prop) throws InterruptedException {
+        if (!prop.getEnable()) return null;
+        ServerBootstrap handler = new ServerBootstrap().option(ChannelOption.SO_BACKLOG, 10240)
+                .group(new NioEventLoopGroup(1), worker)
+                .channel(NioServerSocketChannel.class)
+                .childHandler(new ChannelInitializer<>() {
+                    @Override
+                    protected void initChannel(Channel channel) {
+                        ChannelPipeline pipeline = channel.pipeline();
+                        pipeline.addLast(new HttpServerCodec());
+                        pipeline.addLast(new HttpObjectAggregator(65536));
+                        pipeline.addLast(new ChunkedWriteHandler());
+                        pipeline.addLast(new StaticServerHandler(Path.of(prop.getPath())));
+                    }
+                });
+        Channel channel = handler.bind(prop.getPort()).sync().channel();
+        log.info("static service started success on http://127.0.0.1:{}/", prop.getPort());
+        return channel;
     }
 
     @Bean(conditionalOnBeanByType = ReverseProxyProp.class)
@@ -88,7 +113,7 @@ public class ServerStarter {
     }
 
     @Bean(conditionalOnBeanByType = HttpProxyProp.class)
-    public Channel httpProxy(HttpProxyProp httpProxyProp,EncryptProp encryptProp) throws Exception {
+    public Channel httpProxy(HttpProxyProp httpProxyProp, EncryptProp encryptProp) throws Exception {
         if (!httpProxyProp.getEnabled()) return null;
         ServerBootstrap bootstrap = new ServerBootstrap();
         bootstrap.option(ChannelOption.SO_BACKLOG, 10240)
@@ -108,8 +133,8 @@ public class ServerStarter {
                             ch.pipeline().addLast(
                                     new LengthFieldBasedFrameDecoder(Integer.MAX_VALUE, 0, 4, 0, 4),
                                     new LengthFieldPrepender(4),
-                                    new AuthenticAndEncrypt(encryptProp.getAesKey(),encryptProp.getAuthenticationToken()),
-                                    new AuthenticAndDecrypt(encryptProp.getAesKey(),encryptProp.getAuthenticationToken(),null),
+                                    new AuthenticAndEncrypt(encryptProp.getAesKey(), encryptProp.getAuthenticationToken()),
+                                    new AuthenticAndDecrypt(encryptProp.getAesKey(), encryptProp.getAuthenticationToken(), null),
                                     new HttpRequestDecoder(),
                                     new HttpResponseEncoder(),
                                     new HttpObjectAggregator(Integer.MAX_VALUE),
@@ -167,10 +192,10 @@ public class ServerStarter {
     /**
      * 启动内网穿透本地服务
      */
-    @Bean(value = "sentinelDaemonThread",conditionalOnBeanByType = LocalProp.class)
+    @Bean(value = "sentinelDaemonThread", conditionalOnBeanByType = LocalProp.class)
     public Thread intranetLocalServer(
             @Inject("remoteChannelMap") Map<Struct.ConfigGroup, Set<Channel>> remoteChannelMap,
-                LocalProp localProp, ChannelSentinel sentinel) {
+            LocalProp localProp, ChannelSentinel sentinel) {
         if (!localProp.getEnabled()) return null;
         registerIntranetLocalInstructionHandler();
         //初始化配置消息
@@ -200,7 +225,7 @@ public class ServerStarter {
      * 内网穿透远程服务 对外服务的端口号 与 对外服务的父管道
      */
     @Bean
-    public Map<Integer,Channel> remoteServerForBrowserParentChannel() {
+    public Map<Integer, Channel> remoteServerForBrowserParentChannel() {
         return new ConcurrentHashMap<>();
     }
 
@@ -208,7 +233,7 @@ public class ServerStarter {
      * 启动内网穿透远程服务
      */
     @Bean(conditionalOnBeanByType = RemoteProp.class)
-    public Channel intranetRemoteServer(RemoteProp prop,EncryptProp encryptProp) throws InterruptedException {
+    public Channel intranetRemoteServer(RemoteProp prop, EncryptProp encryptProp) throws InterruptedException {
         if (!prop.getEnabled()) return null;
         registerIntranetRemoteInstructionHandler();
         ServerBootstrap bootstrap = new ServerBootstrap();
@@ -224,8 +249,8 @@ public class ServerStarter {
                         channel.pipeline().addLast(
                                 new LengthFieldBasedFrameDecoder(Integer.MAX_VALUE, 0, 4, 0, 4),
                                 new LengthFieldPrepender(4),
-                                new AuthenticAndEncrypt(encryptProp.getAesKey(),encryptProp.getAuthenticationToken()),
-                                new AuthenticAndDecrypt(encryptProp.getAesKey(),encryptProp.getAuthenticationToken(),Protocol::invokeHandler),
+                                new AuthenticAndEncrypt(encryptProp.getAesKey(), encryptProp.getAuthenticationToken()),
+                                new AuthenticAndDecrypt(encryptProp.getAesKey(), encryptProp.getAuthenticationToken(), Protocol::invokeHandler),
                                 new ObjectEncoder(),
                                 new ObjectDecoder(ClassResolvers.cacheDisabled(ServerStarter.class.getClassLoader())),
                                 beanFactory.getBean(ChanelWarehouse.class),
@@ -235,12 +260,12 @@ public class ServerStarter {
                 })
                 .bind(prop.getPort()).sync().channel();
 
-        log.info("Intranet-Remote-Master-Server started success on http://127.0.0.1:{}/",prop.getPort());
-        intranetRemoteStartTime=System.currentTimeMillis();
+        log.info("Intranet-Remote-Master-Server started success on http://127.0.0.1:{}/", prop.getPort());
+        intranetRemoteStartTime = System.currentTimeMillis();
         return channel;
     }
 
-    private void registerIntranetRemoteInstructionHandler(){
+    private void registerIntranetRemoteInstructionHandler() {
         Protocol.HEARTBEAT_LOCAL_NORMAL_MSG.registerInstructionHandler(beanFactory.getBean(HeartBeatLocalNormalMsgHandler.class));
         Protocol.HEARTBEAT_LOCAL_ERROR_MSG.registerInstructionHandler(beanFactory.getBean(HeartbeatLocalErrorMsgHandler.class));
         Protocol.EXPEND_RESP.registerInstructionHandler(beanFactory.getBean(ExpendRespHandler.class));
@@ -248,14 +273,13 @@ public class ServerStarter {
         Protocol.SHRINK_RESP.registerInstructionHandler(beanFactory.getBean(ShrinkRespHandler.class));
     }
 
-    private void registerIntranetLocalInstructionHandler(){
+    private void registerIntranetLocalInstructionHandler() {
         Protocol.HEARTBEAT_REMOTE_NORMAL_MSG.registerInstructionHandler(new InstructionHandler() {
         });
         Protocol.HEARTBEAT_REMOTE_ERROR_MSG.registerInstructionHandler(beanFactory.getBean(HeartBeatRemoteErrorMsgHandler.class));
         Protocol.EXPEND.registerInstructionHandler(beanFactory.getBean(ExpendHandler.class));
         Protocol.SHRINK.registerInstructionHandler(beanFactory.getBean(ShrinkHandler.class));
     }
-
 
 
 }

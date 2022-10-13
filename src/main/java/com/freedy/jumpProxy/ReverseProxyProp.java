@@ -26,6 +26,8 @@ public class ReverseProxyProp {
     private String[] serverAddress;
     private String[] BalanceAlgorithmWeight;
 
+
+
     @Skip
     private LoadBalance<Struct.IpAddress> reverseProxyLB;
 

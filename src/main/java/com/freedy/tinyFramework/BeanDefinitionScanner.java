@@ -135,11 +135,11 @@ public class BeanDefinitionScanner implements Scanner {
             if (post != null) {
                 if (method.getParameterCount() != 0)
                     throw new BeanException("post-construct method should not have parameters");
-                beanDefinition.addPostConstruct(new BeanDefinition.DelayMethod(method,post.failFast()));
+                beanDefinition.addPostConstruct(new BeanDefinition.DelayMethod(method, post.failFast()));
             }
             Inject inject = method.getAnnotation(Inject.class);
             if (inject != null)
-                beanDefinition.addInjectMethods(new BeanDefinition.DelayMethod(method,inject.failFast()));
+                beanDefinition.addInjectMethods(new BeanDefinition.DelayMethod(method, inject.failFast()));
         }
     }
 
@@ -151,17 +151,25 @@ public class BeanDefinitionScanner implements Scanner {
     public static List<Class<?>> doScan(@NonNull String[] PackageNames, String[] exclude) {
 
         ClassLoader classLoader = BeanDefinitionScanner.class.getClassLoader();
+        String urls = Objects.requireNonNull(classLoader.getResource(BeanDefinitionScanner.class.getName().replace(".", "\\") + ".class")).toString();
+        String baseUrl = null;
+        if (urls.contains("!/")) {
+            baseUrl = urls.split("!/")[0] + "!/";
+        } else if (urls.contains("classes/")) {
+            baseUrl = urls.split("classes/")[0] + "/classes/";
+        }
+
         List<Class<?>> list = new ArrayList<>();
 
         for (String PackageName : PackageNames) {
             try {
-                URL url = classLoader.getResource(PackageName.replaceAll("\\.", "/"));
+                URL url = baseUrl == null ? classLoader.getResource(PackageName.replaceAll("\\.", "/")) : new URL(baseUrl + PackageName.replaceAll("\\.", "/"));
                 assert url != null;
                 String protocol = url.getProtocol();
                 if (protocol.equals("file")) {
                     fileScan(exclude, list, PackageName, url);
                 } else if (protocol.equals("jar")) {
-                    jarScan(exclude, list, PackageName, classLoader);
+                    jarScan(exclude, list, PackageName, url);
                 }
 
             } catch (Exception e) {
@@ -222,10 +230,9 @@ public class BeanDefinitionScanner implements Scanner {
     /**
      * jar环境扫描
      */
-    private static void jarScan(String[] exclude, List<Class<?>> list, String PackageName, ClassLoader loader) throws Exception {
+    private static void jarScan(String[] exclude, List<Class<?>> list, String PackageName, URL url) throws Exception {
         String pathName = PackageName.replace(".", "/");
-        URL url = loader.getResource(pathName);
-        assert url != null;
+
         JarURLConnection jarURLConnection = (JarURLConnection) url.openConnection();
         JarFile jarFile = jarURLConnection.getJarFile();
 
@@ -256,7 +263,7 @@ public class BeanDefinitionScanner implements Scanner {
 
     @Override
     public void setApplication(AbstractApplication application) {
-        abstractApplication=application;
+        abstractApplication = application;
     }
 
 }
