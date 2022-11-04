@@ -151,7 +151,7 @@ public class BeanDefinitionScanner implements Scanner {
     public static List<Class<?>> doScan(@NonNull String[] PackageNames, String[] exclude) {
 
         ClassLoader classLoader = BeanDefinitionScanner.class.getClassLoader();
-        String urls = Objects.requireNonNull(classLoader.getResource(BeanDefinitionScanner.class.getName().replace(".", "\\") + ".class")).toString();
+        String urls = Objects.requireNonNull(classLoader.getResource(BeanDefinitionScanner.class.getName().replace(".", "/") + ".class")).toString();
         String baseUrl = null;
         if (urls.contains("!/")) {
             baseUrl = urls.split("!/")[0] + "!/";
