@@ -3,7 +3,11 @@
 
 name: Maven Package
 
-on: push
+on:
+  push:
+   branches:
+    - main
+    - release/*
 
 jobs:
   build:
@@ -25,25 +29,44 @@ jobs:
 
     - name: 🔨 Build with Maven
       run: mvn package
+    - run: mkdir staging && cp target/*.jar staging
 
-    - name: 🚀 SCP to remote server
-      uses: appleboy/scp-action@master
-      with:
-        host: ${{ secrets.SSHHOST }}
-        username: ${{ secrets.SSHUSSER }}
-        password: ${{ secrets.SSHPASSWORD }}
-        port: 22
-        source: "./target/netUtils-1.0.0.jar"
-        target: "/root"
-        strip_components: 2
+    # 设置 jobs Maven pom 版本环境变量
+    - name: Set Release version env variable
+      run: |
+        echo "RELEASE_VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)" >> $GITHUB_ENV
+    - name: "Build & test"
+      run: |
+        echo "done!"
 
-    - name: 🌈 run server
-      uses: appleboy/ssh-action@master
+    # 上传文件并发布 Release
+    - uses: "marvinpinto/action-automatic-releases@latest"
       with:
-        host: ${{ secrets.SSHHOST }}
-        username: ${{ secrets.SSHUSSER }}
-        password: ${{ secrets.SSHPASSWORD }}
-        port: 22
-        script: |
-          cd /root
-          ./start.sh
+        repo_token: "${{ secrets.GITHUB_TOKEN }}"
+        automatic_release_tag: "${{ env.RELEASE_VERSION }}"
+        prerelease: false
+        title: "Release ${{ env.RELEASE_VERSION }}"
+        files: |
+          staging/*.jar
+
+    # - name: 🚀 SCP to remote server
+    #   uses: appleboy/scp-action@master
+    #   with:
+    #     host: ${{ secrets.SSHHOST }}
+    #     username: ${{ secrets.SSHUSSER }}
+    #     password: ${{ secrets.SSHPASSWORD }}
+    #     port: 22
+    #     source: "./target/netUtils-1.0.0.jar"
+    #     target: "/root"
+    #     strip_components: 2
+
+    # - name: 🌈 run server
+    #   uses: appleboy/ssh-action@master
+    #   with:
+    #     host: ${{ secrets.SSHHOST }}
+    #     username: ${{ secrets.SSHUSSER }}
+    #     password: ${{ secrets.SSHPASSWORD }}
+    #     port: 22
+    #     script: |
+    #       cd /root
+    #       ./start.sh

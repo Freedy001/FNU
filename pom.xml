@@ -15,13 +15,6 @@
     </properties>
 
     <dependencies>
-
-        <dependency>
-            <groupId>io.github.freedy001</groupId>
-            <artifactId>expression</artifactId>
-            <version>1.0.1</version>
-        </dependency>
-
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-all</artifactId>
