@@ -113,6 +113,7 @@ public class StaticServerHandler extends SimpleChannelInboundHandler<FullHttpReq
         HttpUtil.setContentLength(response, fileLength);
         setContentTypeHeader(response, file);
         setDateAndCacheHeaders(response, file);
+        setCrossHeaders(response);
 
         if (!keepAlive) {
             response.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
@@ -140,6 +141,8 @@ public class StaticServerHandler extends SimpleChannelInboundHandler<FullHttpReq
             lastContentFuture.addListener(ChannelFutureListener.CLOSE);
         }
     }
+
+
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
@@ -321,5 +324,11 @@ public class StaticServerHandler extends SimpleChannelInboundHandler<FullHttpReq
         response.headers().set(HttpHeaderNames.CONTENT_TYPE, mimeTypesMap.getContentType(file.getPath()));
     }
 
-
+    private void setCrossHeaders(HttpResponse response) {
+        response.headers().set(HttpHeaderNames.ACCESS_CONTROL_ALLOW_ORIGIN, "*");
+        response.headers().set(HttpHeaderNames.ACCESS_CONTROL_ALLOW_HEADERS, "*");
+        response.headers().set(HttpHeaderNames.ACCESS_CONTROL_ALLOW_METHODS, "*");
+        response.headers().set(HttpHeaderNames.ACCESS_CONTROL_ALLOW_CREDENTIALS, "*");
+        response.headers().set(HttpHeaderNames.ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK, "*");
+    }
 }
