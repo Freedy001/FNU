@@ -12,9 +12,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write-all
-      packages: write-all
+    permissions: write-all
 
     steps:
     - uses: actions/checkout@v2
