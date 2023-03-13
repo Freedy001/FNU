@@ -329,6 +329,6 @@ public class StaticServerHandler extends SimpleChannelInboundHandler<FullHttpReq
         response.headers().set(HttpHeaderNames.ACCESS_CONTROL_ALLOW_HEADERS, "*");
         response.headers().set(HttpHeaderNames.ACCESS_CONTROL_ALLOW_METHODS, "*");
         response.headers().set(HttpHeaderNames.ACCESS_CONTROL_ALLOW_CREDENTIALS, "*");
-        response.headers().set(HttpHeaderNames.ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK, "*");
+        response.headers().set(HttpHeaderNames.ACCESS_CONTROL_REQUEST_HEADERS, "*");
     }
 }
