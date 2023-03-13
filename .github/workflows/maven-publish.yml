@@ -2,7 +2,6 @@
 # For more information see: https://github.com/actions/setup-java/blob/main/docs/advanced-usage.md#apache-maven-with-a-settings-path
  
 name: Maven Package
-permissions: write-all
 
 on:
   push:
@@ -12,11 +11,10 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-      packages: write
+      contents: write-all
+      packages: write-all
 
     steps:
     - uses: actions/checkout@v2
