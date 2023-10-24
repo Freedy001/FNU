@@ -38,7 +38,7 @@ jobs:
         JAR_NAME=$(mvn help:evaluate -Dexpression='project.artifactId' -q -DforceStdout)-${RELEASE_VERSION}
         echo "JAR_NAME=$JAR_NAME" >> $GITHUB_ENV
         mkdir staging && cp target/$JAR_NAME.jar staging/
-        native-image --initialize-at-build-time=ch.qos.logback --initialize-at-build-time=com.freedy.log.EasyPatternLayout --initialize-at-build-time=org.slf4j  --initialize-at-build-time=com.freedy.tinyFramework.BeanDefinitionScanner -jar staging/$JAR_NAME.jar
+        native-image --initialize-at-build-time=ch.qos.logback --initialize-at-build-time=com.freedy.log.EasyPatternLayout --initialize-at-build-time=org.slf4j  --initialize-at-build-time=com.freedy.tinyFramework.BeanDefinitionScanner -jar staging/$JAR_NAME.jar -o staging/
         ls -l staging/
 
     - name: compile to windows native
@@ -48,7 +48,7 @@ jobs:
         $JAR_NAME="$(mvn help:evaluate -Dexpression='project.artifactId' -q -DforceStdout)-${RELEASE_VERSION}"
         echo "JAR_NAME=$JAR_NAME" >> $GITHUB_ENV
         mkdir staging && cp target/$JAR_NAME.jar staging/
-        native-image --initialize-at-build-time=ch.qos.logback --initialize-at-build-time=com.freedy.log.EasyPatternLayout --initialize-at-build-time=org.slf4j  --initialize-at-build-time=com.freedy.tinyFramework.BeanDefinitionScanner -jar staging/$JAR_NAME.jar
+        native-image --initialize-at-build-time=ch.qos.logback --initialize-at-build-time=com.freedy.log.EasyPatternLayout --initialize-at-build-time=org.slf4j  --initialize-at-build-time=com.freedy.tinyFramework.BeanDefinitionScanner -jar staging/$JAR_NAME.jar -o staging/
         ls staging/
 
     - name: Upload binary

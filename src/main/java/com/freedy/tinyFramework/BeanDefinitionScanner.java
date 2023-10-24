@@ -26,12 +26,26 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
+import java.util.stream.Collectors;
 
 /**
  * @author Freedy
  * @date 2021/12/2 15:52
  */
+@SuppressWarnings({"CallToPrintStackTrace", "resource"})
 public class BeanDefinitionScanner implements Scanner {
+
+    private static final List<String> classNames = new ArrayList<>();
+
+    static {
+        if (Optional.ofNullable(System.getProperty("org.graalvm.nativeimage.imagecode")).orElse("").equals("buildtime")) {
+            for (String name : scanClassName(new String[]{"com.freedy"}, new String[]{"com.freedy.tinyFramework"})) {
+                System.out.println("[BUILD-TIME] add to " + name + " package search path");
+                classNames.add(name);
+            }
+        }
+    }
+
 
     private AbstractApplication abstractApplication;
 
@@ -46,9 +60,9 @@ public class BeanDefinitionScanner implements Scanner {
     }
 
     @Override
-    public void scan(String[] PackageName, String[] exclude) {
+    public void scan(String[] packagesName, String[] exclude) {
 
-        List<Class<?>> classList = doScan(PackageName, exclude);
+        List<Class<?>> classList = doScan(packagesName, exclude);
         for (Class<?> beanClass : classList) {
             Part part = beanClass.getAnnotation(Part.class);
             if (part != null) {
@@ -148,8 +162,17 @@ public class BeanDefinitionScanner implements Scanner {
         return className.substring(0, 1).toLowerCase(Locale.ROOT) + className.substring(1);
     }
 
-    public static List<Class<?>> doScan(@NonNull String[] PackageNames, String[] exclude) {
+    public static List<Class<?>> doScan(@NonNull String[] packageNames, String[] exclude) {
+        return classNames.isEmpty() ? scanClassName(packageNames, exclude).stream().map(i -> {
+            try {
+                return Class.forName(i);
+            } catch (ClassNotFoundException e) {
+                throw new RuntimeException(e);
+            }
+        }).collect(Collectors.toList()) : nativeScan(packageNames, exclude);
+    }
 
+    private static List<String> scanClassName(String[] packageNames, String[] exclude) {
         ClassLoader classLoader = BeanDefinitionScanner.class.getClassLoader();
         String urls = Objects.requireNonNull(classLoader.getResource(BeanDefinitionScanner.class.getName().replace(".", "/") + ".class")).toString();
         String baseUrl = null;
@@ -159,9 +182,9 @@ public class BeanDefinitionScanner implements Scanner {
             baseUrl = urls.split("classes/")[0] + "/classes/";
         }
 
-        List<Class<?>> list = new ArrayList<>();
+        List<String> list = new ArrayList<>();
 
-        for (String PackageName : PackageNames) {
+        for (String PackageName : packageNames) {
             try {
                 URL url = baseUrl == null ? classLoader.getResource(PackageName.replaceAll("\\.", "/")) : new URL(baseUrl + PackageName.replaceAll("\\.", "/"));
                 assert url != null;
@@ -183,7 +206,7 @@ public class BeanDefinitionScanner implements Scanner {
     /**
      * 普通环境扫描
      */
-    private static void fileScan(String[] exclude, List<Class<?>> list, String PackageName, URL url) throws IOException, URISyntaxException {
+    private static void fileScan(String[] exclude, List<String> list, String PackageName, URL url) throws IOException, URISyntaxException {
         String[] packSplit = PackageName.split("\\.");
         String lastPackageName = packSplit[packSplit.length - 1];
         Files.walk(Paths.get(url.toURI())).forEach(pa -> {
@@ -209,20 +232,14 @@ public class BeanDefinitionScanner implements Scanner {
                     joiner.add(split[i]);
                 }
 
-                try {
-                    String fullClassName = PackageName + "." + joiner;
-                    if (exclude != null) {
-                        for (String s : exclude) {
-                            if (fullClassName.contains(s)) return;
-                        }
+                String fullClassName = PackageName + "." + joiner;
+                if (exclude != null) {
+                    for (String s : exclude) {
+                        if (fullClassName.contains(s)) return;
                     }
-
-                    Class<?> aClass = Class.forName(fullClassName);
-                    list.add(aClass);
-                } catch (ClassNotFoundException e) {
-                    e.printStackTrace();
                 }
 
+                list.add(fullClassName);
             }
         });
     }
@@ -230,7 +247,7 @@ public class BeanDefinitionScanner implements Scanner {
     /**
      * jar环境扫描
      */
-    private static void jarScan(String[] exclude, List<Class<?>> list, String PackageName, URL url) throws Exception {
+    private static void jarScan(String[] exclude, List<String> list, String PackageName, URL url) throws Exception {
         String pathName = PackageName.replace(".", "/");
 
         JarURLConnection jarURLConnection = (JarURLConnection) url.openConnection();
@@ -250,9 +267,31 @@ public class BeanDefinitionScanner implements Scanner {
                         if (fullClazzName.contains(s)) return;
                     }
                 }
-                list.add(Class.forName(fullClazzName));
+                list.add(fullClazzName);
             }
         }
+    }
+
+    private static List<Class<?>> nativeScan(String[] include, String[] exclude) {
+        return classNames.stream().filter(i -> {
+            if (include == null) return false;
+            for (String s : include) {
+                if (i.startsWith(s)) return true;
+            }
+            return false;
+        }).filter(i -> {
+            if (exclude == null) return true;
+            for (String s : exclude) {
+                if (i.startsWith(s)) return false;
+            }
+            return true;
+        }).map(i -> {
+            try {
+                return Class.forName(i);
+            } catch (ClassNotFoundException e) {
+                throw new RuntimeException(e);
+            }
+        }).collect(Collectors.toList());
     }
 
 
