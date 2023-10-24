@@ -31,25 +31,19 @@ jobs:
       run: mvn package
 
     # 设置 jobs Maven pom 版本环境变量
-    - name: Set Release env variable
-      run: |
-        RELEASE_VERSION=$(mvn help:evaluate -Dexpression='project.version' -q -DforceStdout)
-        ARTIFACT_NAME=$(mvn help:evaluate -Dexpression='project.artifactId' -q -DforceStdout)-${RELEASE_VERSION}
-        #echo "RELEASE_VERSION=$(mvn help:evaluate -Dexpression='project.version' -q -DforceStdout)" >> $GITHUB_ENV
-        mkdir staging && cp target/$ARTIFACT_NAME.jar staging/
-    - name: "Build & test"
-      run: |
-        echo "done!"
-        
     - name: compile to native
       run: |
-          native-image -H:+UnlockExperimentalVMOptions --initialize-at-build-time=ch.qos.logback --initialize-at-build-time=com.freedy.log.EasyPatternLayout --initialize-at-build-time=org.slf4j  --initialize-at-build-time=com.freedy.tinyFramework.BeanDefinitionScanner -jar staging/$ARTIFACT_NAME.jar
-          ls -l staging/
+        RELEASE_VERSION=$(mvn help:evaluate -Dexpression='project.version' -q -DforceStdout)
+        JAR_NAME=$(mvn help:evaluate -Dexpression='project.artifactId' -q -DforceStdout)-${RELEASE_VERSION}
+        echo "JAR_NAME=$JAR_NAME" >> $GITHUB_ENV
+        mkdir staging && cp target/$JAR_NAME.jar staging/
+        native-image -H:+UnlockExperimentalVMOptions --initialize-at-build-time=ch.qos.logback --initialize-at-build-time=com.freedy.log.EasyPatternLayout --initialize-at-build-time=org.slf4j  --initialize-at-build-time=com.freedy.tinyFramework.BeanDefinitionScanner -jar staging/$JAR_NAME.jar
+        ls -l staging/
 
     - name: Upload binary
       uses: actions/upload-artifact@v2
       with:
-        name: $ARTIFACT_NAME-${{ matrix.os }}
+        name: ${{ env.JAR_NAME }}-${{ matrix.os }}
         path: staging/*
 
     # 上传文件并发布 Release
