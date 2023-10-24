@@ -15,7 +15,7 @@ jobs:
     permissions: write-all
     strategy:
       matrix:
-        os: [macos-latest,  ubuntu-latest]
+        os: [macos-latest, windows-latest, ubuntu-latest]
 
     steps:
     - uses: actions/checkout@v2
@@ -31,10 +31,21 @@ jobs:
       run: mvn package
 
     # 设置 jobs Maven pom 版本环境变量
-    - name: compile to native
+    - name: compile to linux or mac native
+      if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest'
       run: |
         RELEASE_VERSION=$(mvn help:evaluate -Dexpression='project.version' -q -DforceStdout)
         JAR_NAME=$(mvn help:evaluate -Dexpression='project.artifactId' -q -DforceStdout)-${RELEASE_VERSION}
+        echo "JAR_NAME=$JAR_NAME" >> $GITHUB_ENV
+        mkdir staging && cp target/$JAR_NAME.jar staging/
+        native-image --initialize-at-build-time=ch.qos.logback --initialize-at-build-time=com.freedy.log.EasyPatternLayout --initialize-at-build-time=org.slf4j  --initialize-at-build-time=com.freedy.tinyFramework.BeanDefinitionScanner -jar staging/$JAR_NAME.jar
+        ls -l staging/
+
+    - name: compile to windows native
+      if: matrix.os == 'windows-latest' 
+      run: |
+        $RELEASE_VERSION=$(mvn help:evaluate -Dexpression='project.version' -q -DforceStdout)
+        $JAR_NAME="$(mvn help:evaluate -Dexpression='project.artifactId' -q -DforceStdout)-${RELEASE_VERSION}"
         echo "JAR_NAME=$JAR_NAME" >> $GITHUB_ENV
         mkdir staging && cp target/$JAR_NAME.jar staging/
         native-image --initialize-at-build-time=ch.qos.logback --initialize-at-build-time=com.freedy.log.EasyPatternLayout --initialize-at-build-time=org.slf4j  --initialize-at-build-time=com.freedy.tinyFramework.BeanDefinitionScanner -jar staging/$JAR_NAME.jar
@@ -44,7 +55,29 @@ jobs:
       uses: actions/upload-artifact@v2
       with:
         name: ${{ env.JAR_NAME }}-${{ matrix.os }}
-        path: staging/*
+        path: staging/
+
+  # release:
+  #   name: Create Release
+  #   runs-on: windows-latest
+  #   needs: build # 表示依赖于build这个job的完成
+  #   steps:
+  #     - name: Download artifact
+  #       uses: actions/download-artifact@v2
+  #       with:
+  #         name: native-image-demo
+  #     - name: Create Release
+  #       uses: softprops/action-gh-release@v1
+  #       with:
+  #         files: native-image-demo # 指定要上传的文件名或通配符
+  #         tag_name: ${{ github.ref }} # 指定要创建的标签名，默认为当前推送的标签
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # 指定github token，用于授权
+   
+
+
+
+
 
     # 上传文件并发布 Release
     # - uses: "marvinpinto/action-automatic-releases@latest"
