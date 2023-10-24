@@ -33,8 +33,9 @@ jobs:
     # 设置 jobs Maven pom 版本环境变量
     - name: Set Release env variable
       run: |
-        echo "RELEASE_VERSION=$(mvn help:evaluate -Dexpression='project.version' -q -DforceStdout)" >> $GITHUB_ENV
+        RELEASE_VERSION=$(mvn help:evaluate -Dexpression='project.version' -q -DforceStdout)
         ARTIFACT_NAME=$(mvn help:evaluate -Dexpression='project.artifactId' -q -DforceStdout)-${RELEASE_VERSION}
+        #echo "RELEASE_VERSION=$(mvn help:evaluate -Dexpression='project.version' -q -DforceStdout)" >> $GITHUB_ENV
         mkdir staging && cp target/$ARTIFACT_NAME.jar staging/
     - name: "Build & test"
       run: |
