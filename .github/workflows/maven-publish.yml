@@ -37,9 +37,10 @@ jobs:
         RELEASE_VERSION=$(mvn help:evaluate -Dexpression='project.version' -q -DforceStdout)
         JAR_NAME=$(mvn help:evaluate -Dexpression='project.artifactId' -q -DforceStdout)-${RELEASE_VERSION}
         echo "JAR_NAME=$JAR_NAME" >> $GITHUB_ENV
-        mkdir staging && cp target/$JAR_NAME.jar staging/
-        cd staging
+        mkdir release && cp target/$JAR_NAME.jar release/
+        cd release
         native-image --initialize-at-build-time=ch.qos.logback --initialize-at-build-time=com.freedy.log.EasyPatternLayout --initialize-at-build-time=org.slf4j  --initialize-at-build-time=com.freedy.tinyFramework.BeanDefinitionScanner -jar ./$JAR_NAME.jar
+        rm ./$JAR_NAME.jar
         ls -l
 
     - name: compile to windows native
@@ -47,49 +48,49 @@ jobs:
       run: |
         $RELEASE_VERSION=$(mvn help:evaluate -Dexpression='project.version' -q -DforceStdout)
         $JAR_NAME="$(mvn help:evaluate -Dexpression='project.artifactId' -q -DforceStdout)-${RELEASE_VERSION}"
-        echo "JAR_NAME=$JAR_NAME" >> $GITHUB_ENV
-        mkdir staging && cp target/$JAR_NAME.jar staging/
-        cd staging
+        echo "`$JAR_NAME=$JAR_NAME" >> $GITHUB_ENV
+        mkdir release && cp target/$JAR_NAME.jar release/
+        cd release
         native-image --initialize-at-build-time=ch.qos.logback --initialize-at-build-time=com.freedy.log.EasyPatternLayout --initialize-at-build-time=org.slf4j  --initialize-at-build-time=com.freedy.tinyFramework.BeanDefinitionScanner -jar ./$JAR_NAME.jar
+        rm ./$JAR_NAME.jar
         ls
 
     - name: Upload binary
       uses: actions/upload-artifact@v2
       with:
         name: ${{ env.JAR_NAME }}-${{ matrix.os }}
-        path: staging/
+        path: release/
 
-  # release:
-  #   name: Create Release
-  #   runs-on: windows-latest
-  #   needs: build # 表示依赖于build这个job的完成
-  #   steps:
-  #     - name: Download artifact
-  #       uses: actions/download-artifact@v2
-  #       with:
-  #         name: native-image-demo
-  #     - name: Create Release
-  #       uses: softprops/action-gh-release@v1
-  #       with:
-  #         files: native-image-demo # 指定要上传的文件名或通配符
-  #         tag_name: ${{ github.ref }} # 指定要创建的标签名，默认为当前推送的标签
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # 指定github token，用于授权
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: build # 表示依赖于build这个job的完成
+    steps:
+      - uses: actions/checkout@v2
+      - run: echo "RELEASE_VERSION=$(mvn help:evaluate -Dexpression='project.version' -q -DforceStdout)" >> $GITHUB_ENV
+      - name: Download artifact
+        uses: actions/download-artifact@v2
+        with:
+          path: release/
+          run: ls -l release/
+      # - name: Create Release
+      #   uses: softprops/action-gh-release@v1
+      #   with:
+      #     files: native-image-demo # 指定要上传的文件名或通配符
+      #     tag_name: ${{ github.ref }} # 指定要创建的标签名，默认为当前推送的标签
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # 指定github token，用于授权
    
-
-
-
-
-
     # 上传文件并发布 Release
-    # - uses: "marvinpinto/action-automatic-releases@latest"
-    #   with:
-    #     repo_token: "${{ secrets.GITHUB_TOKEN }}"
-    #     automatic_release_tag: "${{ env.RELEASE_VERSION }}"
-    #     prerelease: false
-    #     title: "Release ${{ env.RELEASE_VERSION }}"
-    #     files: |
-    #       staging/*.jar
+      - name: Create Release
+        uses: "marvinpinto/action-automatic-releases@latest"
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          automatic_release_tag: "${{ env.RELEASE_VERSION }}"
+          prerelease: false
+          title: "Release ${{ env.RELEASE_VERSION }}"
+          files: |
+            release/*
 
     # - name: 🚀 SCP to remote server
     #   uses: appleboy/scp-action@master
