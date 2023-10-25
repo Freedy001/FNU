@@ -39,7 +39,7 @@ jobs:
         echo "JAR_NAME=$JAR_NAME" >> $GITHUB_ENV
         mkdir release && cp target/$JAR_NAME.jar release/
         cd release
-        native-image -Dgraalvm.nativeimage=buildtime --initialize-at-build-time=ch.qos.logback --initialize-at-build-time=com.freedy.log.EasyPatternLayout --initialize-at-build-time=org.slf4j  --initialize-at-build-time=com.freedy.tinyFramework.BeanDefinitionScanner -jar ./$JAR_NAME.jar
+        native-image '-Dgraalvm.nativeimage=buildtime' --initialize-at-build-time=ch.qos.logback --initialize-at-build-time=com.freedy.log.EasyPatternLayout --initialize-at-build-time=org.slf4j  --initialize-at-build-time=com.freedy.tinyFramework.BeanDefinitionScanner -jar ./$JAR_NAME.jar
         rm ./$JAR_NAME.jar
         cp ../src/main/resources/conf.properties ./
         ls -l
