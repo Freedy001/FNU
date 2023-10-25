@@ -38,7 +38,7 @@ public class BeanDefinitionScanner implements Scanner {
     private static final List<String> classNames = new ArrayList<>();
 
     static {
-        if (Optional.ofNullable(System.getProperty("org.graalvm.nativeimage.imagecode")).orElse("").equals("buildtime")) {
+        if (Optional.ofNullable(System.getProperty("graalvm.nativeimage")).orElse("").equals("buildtime")) {
             for (String name : scanClassName(new String[]{"com.freedy"}, new String[]{"com.freedy.tinyFramework"})) {
                 System.out.println("[BUILD-TIME] add to " + name + " package search path");
                 classNames.add(name);
