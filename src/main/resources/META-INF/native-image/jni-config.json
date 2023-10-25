@@ -1,5 +1,16 @@
 [
     {
+        "name": "com.freedy.FNUApplication",
+        "methods": [
+            {
+                "name": "main",
+                "parameterTypes": [
+                    "java.lang.String[]"
+                ]
+            }
+        ]
+    },
+    {
         "name": "java.lang.Boolean",
         "methods": [
             {

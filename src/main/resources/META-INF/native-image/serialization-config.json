@@ -1,5 +1,15 @@
 {
-    "types": [],
-    "lambdaCapturingTypes": [],
-    "proxies": []
-}
+    "types":[
+      {
+        "name":"com.freedy.Struct$ConfigGroup"
+      },
+      {
+        "name":"java.lang.String"
+      }
+    ],
+    "lambdaCapturingTypes":[
+    ],
+    "proxies":[
+    ]
+  }
+  

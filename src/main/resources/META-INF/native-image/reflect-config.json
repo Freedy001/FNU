@@ -474,11 +474,48 @@
         ]
     },
     {
-        "name": "com.freedy.intranetPenetration.local.ClientHandshake"
+        "name": "com.freedy.intranetPenetration.local.ClientHandshake",
+        "methods": [
+            {
+                "name": "exceptionCaught",
+                "parameterTypes": [
+                    "io.netty.channel.ChannelHandlerContext",
+                    "java.lang.Throwable"
+                ]
+            }
+        ]
     },
     {
         "name": "com.freedy.intranetPenetration.local.HeartBeatHandler",
-        "queryAllDeclaredMethods": true
+        "allDeclaredFields": true,
+        "queryAllDeclaredMethods": true,
+        "queryAllPublicConstructors": true,
+        "methods": [
+            {
+                "name": "<init>",
+                "parameterTypes": []
+            },
+            {
+                "name": "channelInactive",
+                "parameterTypes": [
+                    "io.netty.channel.ChannelHandlerContext"
+                ]
+            },
+            {
+                "name": "exceptionCaught",
+                "parameterTypes": [
+                    "io.netty.channel.ChannelHandlerContext",
+                    "java.lang.Throwable"
+                ]
+            },
+            {
+                "name": "userEventTriggered",
+                "parameterTypes": [
+                    "io.netty.channel.ChannelHandlerContext",
+                    "java.lang.Object"
+                ]
+            }
+        ]
     },
     {
         "name": "com.freedy.intranetPenetration.local.LocalProp",
@@ -508,10 +545,54 @@
     },
     {
         "name": "com.freedy.intranetPenetration.local.RequestListener",
-        "queryAllDeclaredMethods": true
+        "allDeclaredFields": true,
+        "queryAllDeclaredMethods": true,
+        "queryAllPublicConstructors": true,
+        "methods": [
+            {
+                "name": "<init>",
+                "parameterTypes": []
+            },
+            {
+                "name": "channelActive",
+                "parameterTypes": [
+                    "io.netty.channel.ChannelHandlerContext"
+                ]
+            },
+            {
+                "name": "channelRead",
+                "parameterTypes": [
+                    "io.netty.channel.ChannelHandlerContext",
+                    "java.lang.Object"
+                ]
+            },
+            {
+                "name": "exceptionCaught",
+                "parameterTypes": [
+                    "io.netty.channel.ChannelHandlerContext",
+                    "java.lang.Throwable"
+                ]
+            }
+        ]
     },
     {
-        "name": "com.freedy.intranetPenetration.local.ResponseForward"
+        "name": "com.freedy.intranetPenetration.local.ResponseForward",
+        "methods": [
+            {
+                "name": "channelRead",
+                "parameterTypes": [
+                    "io.netty.channel.ChannelHandlerContext",
+                    "java.lang.Object"
+                ]
+            },
+            {
+                "name": "exceptionCaught",
+                "parameterTypes": [
+                    "io.netty.channel.ChannelHandlerContext",
+                    "java.lang.Throwable"
+                ]
+            }
+        ]
     },
     {
         "name": "com.freedy.intranetPenetration.remote.ChanelWarehouse",
@@ -527,7 +608,35 @@
     },
     {
         "name": "com.freedy.intranetPenetration.remote.HeartBeatHandler",
-        "queryAllDeclaredMethods": true
+        "allDeclaredFields": true,
+        "queryAllDeclaredMethods": true,
+        "queryAllPublicConstructors": true,
+        "methods": [
+            {
+                "name": "<init>",
+                "parameterTypes": []
+            },
+            {
+                "name": "channelInactive",
+                "parameterTypes": [
+                    "io.netty.channel.ChannelHandlerContext"
+                ]
+            },
+            {
+                "name": "exceptionCaught",
+                "parameterTypes": [
+                    "io.netty.channel.ChannelHandlerContext",
+                    "java.lang.Throwable"
+                ]
+            },
+            {
+                "name": "userEventTriggered",
+                "parameterTypes": [
+                    "io.netty.channel.ChannelHandlerContext",
+                    "java.lang.Object"
+                ]
+            }
+        ]
     },
     {
         "name": "com.freedy.intranetPenetration.remote.RemoteProp",
@@ -543,7 +652,41 @@
     },
     {
         "name": "com.freedy.intranetPenetration.remote.RequestReceiver",
-        "queryAllDeclaredMethods": true
+        "allDeclaredFields": true,
+        "queryAllDeclaredMethods": true,
+        "queryAllPublicConstructors": true,
+        "methods": [
+            {
+                "name": "<init>",
+                "parameterTypes": []
+            },
+            {
+                "name": "channelActive",
+                "parameterTypes": [
+                    "io.netty.channel.ChannelHandlerContext"
+                ]
+            },
+            {
+                "name": "channelInactive",
+                "parameterTypes": [
+                    "io.netty.channel.ChannelHandlerContext"
+                ]
+            },
+            {
+                "name": "channelRead",
+                "parameterTypes": [
+                    "io.netty.channel.ChannelHandlerContext",
+                    "java.lang.Object"
+                ]
+            },
+            {
+                "name": "exceptionCaught",
+                "parameterTypes": [
+                    "io.netty.channel.ChannelHandlerContext",
+                    "java.lang.Throwable"
+                ]
+            }
+        ]
     },
     {
         "name": "com.freedy.intranetPenetration.remote.ResponseListener",
@@ -554,6 +697,13 @@
             {
                 "name": "<init>",
                 "parameterTypes": []
+            },
+            {
+                "name": "channelRead",
+                "parameterTypes": [
+                    "io.netty.channel.ChannelHandlerContext",
+                    "java.lang.Object"
+                ]
             }
         ]
     },
@@ -566,6 +716,13 @@
             {
                 "name": "<init>",
                 "parameterTypes": []
+            },
+            {
+                "name": "exceptionCaught",
+                "parameterTypes": [
+                    "io.netty.channel.ChannelHandlerContext",
+                    "java.lang.Throwable"
+                ]
             }
         ]
     },
@@ -1100,6 +1257,12 @@
                 "parameterTypes": [
                     "io.netty.channel.ChannelHandlerContext",
                     "io.netty.channel.ChannelPromise"
+                ]
+            },
+            {
+                "name": "flush",
+                "parameterTypes": [
+                    "io.netty.channel.ChannelHandlerContext"
                 ]
             },
             {
@@ -1750,6 +1913,12 @@
         "name": "io.netty.handler.codec.http.HttpServerCodec"
     },
     {
+        "name": "io.netty.handler.codec.serialization.ObjectDecoder"
+    },
+    {
+        "name": "io.netty.handler.codec.serialization.ObjectEncoder"
+    },
+    {
         "name": "io.netty.handler.stream.ChunkedWriteHandler",
         "methods": [
             {
@@ -1781,6 +1950,50 @@
         ]
     },
     {
+        "name": "io.netty.handler.timeout.IdleStateHandler",
+        "methods": [
+            {
+                "name": "channelActive",
+                "parameterTypes": [
+                    "io.netty.channel.ChannelHandlerContext"
+                ]
+            },
+            {
+                "name": "channelInactive",
+                "parameterTypes": [
+                    "io.netty.channel.ChannelHandlerContext"
+                ]
+            },
+            {
+                "name": "channelRead",
+                "parameterTypes": [
+                    "io.netty.channel.ChannelHandlerContext",
+                    "java.lang.Object"
+                ]
+            },
+            {
+                "name": "channelReadComplete",
+                "parameterTypes": [
+                    "io.netty.channel.ChannelHandlerContext"
+                ]
+            },
+            {
+                "name": "channelRegistered",
+                "parameterTypes": [
+                    "io.netty.channel.ChannelHandlerContext"
+                ]
+            },
+            {
+                "name": "write",
+                "parameterTypes": [
+                    "io.netty.channel.ChannelHandlerContext",
+                    "java.lang.Object",
+                    "io.netty.channel.ChannelPromise"
+                ]
+            }
+        ]
+    },
+    {
         "name": "io.netty.util.AbstractReferenceCounted",
         "fields": [
             {
@@ -1793,6 +2006,14 @@
         "fields": [
             {
                 "name": "attributes"
+            }
+        ]
+    },
+    {
+        "name": "io.netty.util.DefaultAttributeMap$DefaultAttribute",
+        "fields": [
+            {
+                "name": "attributeMap"
             }
         ]
     },
@@ -1906,6 +2127,7 @@
     },
     {
         "name": "java.lang.Thread",
+        "allDeclaredFields": true,
         "fields": [
             {
                 "name": "threadLocalRandomProbe"
@@ -2055,6 +2277,13 @@
     {
         "name": "jdk.internal.misc.Unsafe",
         "methods": [
+            {
+                "name": "allocateUninitializedArray",
+                "parameterTypes": [
+                    "java.lang.Class",
+                    "int"
+                ]
+            },
             {
                 "name": "getUnsafe",
                 "parameterTypes": []

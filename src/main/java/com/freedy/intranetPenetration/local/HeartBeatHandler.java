@@ -13,7 +13,7 @@ import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.List;
+import java.util.Set;
 import java.util.Map;
 
 /**
@@ -28,7 +28,7 @@ public class HeartBeatHandler extends ChannelInboundHandlerAdapter {
 
     private int readIdleTimes = 0;
     @Inject("remoteChannelMap")
-    private Map<Struct.ConfigGroup, List<Channel>> remoteChannelMap;
+    private Map<Struct.ConfigGroup, Set<Channel>> remoteChannelMap;
 
     @Override
     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) {
