@@ -41,6 +41,7 @@ jobs:
         cd release
         native-image --initialize-at-build-time=ch.qos.logback --initialize-at-build-time=com.freedy.log.EasyPatternLayout --initialize-at-build-time=org.slf4j  --initialize-at-build-time=com.freedy.tinyFramework.BeanDefinitionScanner -jar ./$JAR_NAME.jar
         rm ./$JAR_NAME.jar
+        cp ../src/main/resources/conf.properties ./
         ls -l
 
     - name: compile to windows native
@@ -48,11 +49,12 @@ jobs:
       run: |
         $RELEASE_VERSION=$(mvn help:evaluate -Dexpression='project.version' -q -DforceStdout)
         $JAR_NAME="$(mvn help:evaluate -Dexpression='project.artifactId' -q -DforceStdout)-${RELEASE_VERSION}"
-        echo "`$JAR_NAME=$JAR_NAME" >> $GITHUB_ENV
+        echo "JAR_NAME=$JAR_NAME" >> $env:GITHUB_ENV
         mkdir release && cp target/$JAR_NAME.jar release/
         cd release
         native-image --initialize-at-build-time=ch.qos.logback --initialize-at-build-time=com.freedy.log.EasyPatternLayout --initialize-at-build-time=org.slf4j  --initialize-at-build-time=com.freedy.tinyFramework.BeanDefinitionScanner -jar ./$JAR_NAME.jar
         rm ./$JAR_NAME.jar
+        cp ../src/main/resources/conf.properties ./
         ls
 
     - name: Upload binary
@@ -81,6 +83,7 @@ jobs:
       #   env:
       #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # 指定github token，用于授权
    
+      - run: cd release && for dir in */; do zip -r "${dir%/}.zip" "$dir"; done
     # 上传文件并发布 Release
       - name: Create Release
         uses: "marvinpinto/action-automatic-releases@latest"
@@ -90,7 +93,7 @@ jobs:
           prerelease: false
           title: "Release ${{ env.RELEASE_VERSION }}"
           files: |
-            release/*
+            release/*.zip
 
     # - name: 🚀 SCP to remote server
     #   uses: appleboy/scp-action@master
