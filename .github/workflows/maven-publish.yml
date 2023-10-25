@@ -40,7 +40,7 @@ jobs:
         mkdir staging && cp target/$JAR_NAME.jar staging/
         cd staging
         native-image --initialize-at-build-time=ch.qos.logback --initialize-at-build-time=com.freedy.log.EasyPatternLayout --initialize-at-build-time=org.slf4j  --initialize-at-build-time=com.freedy.tinyFramework.BeanDefinitionScanner -jar ./$JAR_NAME.jar
-        ls -l staging/
+        ls -l
 
     - name: compile to windows native
       if: matrix.os == 'windows-latest' 
@@ -51,7 +51,7 @@ jobs:
         mkdir staging && cp target/$JAR_NAME.jar staging/
         cd staging
         native-image --initialize-at-build-time=ch.qos.logback --initialize-at-build-time=com.freedy.log.EasyPatternLayout --initialize-at-build-time=org.slf4j  --initialize-at-build-time=com.freedy.tinyFramework.BeanDefinitionScanner -jar ./$JAR_NAME.jar
-        ls staging/
+        ls
 
     - name: Upload binary
       uses: actions/upload-artifact@v2
